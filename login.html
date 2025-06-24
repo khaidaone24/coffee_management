@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập nhân viên</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+        }
+        .card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 2rem;
+        }
+    </style>
+</head>
+<body class="flex justify-center items-center min-h-screen p-4">
+    <div id="login-section" class="card w-full max-w-md">
+        <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">Đăng nhập</h2>
+        <p class="text-center text-gray-500 mb-8">Sử dụng mã nhân viên và mật khẩu để truy cập trang cá nhân.</p>
+        <div class="mb-4">
+            <label for="employee-login-id" class="block text-sm font-medium text-gray-700 mb-2">Mã nhân viên</label>
+            <input type="text" id="employee-login-id" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="VD: NV001">
+        </div>
+        <div class="mb-6">
+            <label for="employee-login-password" class="block text-sm font-medium text-gray-700 mb-2">Mật khẩu</label>
+            <input type="password" id="employee-login-password" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••">
+        </div>
+        <button id="employee-login-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-200">
+            Đăng nhập
+        </button>
+        <p id="login-message" class="text-center text-red-500 mt-4 h-5"></p>
+    </div>
+
+<script>
+    const API_BASE_URL = 'http://localhost:3002/api';
+
+    const employeeLoginIdInput = document.getElementById('employee-login-id');
+    const employeeLoginPasswordInput = document.getElementById('employee-login-password');
+    const employeeLoginBtn = document.getElementById('employee-login-btn');
+    const loginMessage = document.getElementById('login-message');
+    
+    function showMessage(element, message, isError = false) {
+        element.textContent = message;
+        element.className = `text-center mt-4 h-5 ${isError ? 'text-red-500' : 'text-green-600'}`;
+    }
+
+    employeeLoginBtn.addEventListener('click', async () => {
+        const employeeId = employeeLoginIdInput.value;
+        const password = employeeLoginPasswordInput.value;
+        
+        if (!employeeId || !password) {
+            showMessage(loginMessage, "Vui lòng nhập đủ thông tin.", true);
+            return;
+        }
+
+        employeeLoginBtn.disabled = true;
+        employeeLoginBtn.textContent = 'Đang đăng nhập...';
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ employeeId, password })
+            });
+            const data = await response.json();
+
+            if (data.success && data.employee) {
+                // Store user info in session storage
+                sessionStorage.setItem('user', JSON.stringify(data.employee));
+                
+                // Redirect based on role, now accepting 'staff'
+                if (data.employee.role === 'manager') {
+                    window.location.href = '/management';
+                } else if (data.employee.role === 'employee' || data.employee.role === 'staff') {
+                    window.location.href = '/employee/dashboard';
+                } else {
+                    showMessage(loginMessage, 'Vai trò không được hỗ trợ.', true);
+                }
+            } else {
+                showMessage(loginMessage, data.message || 'Thông tin đăng nhập không chính xác.', true);
+            }
+        } catch (error) {
+            showMessage(loginMessage, 'Lỗi kết nối server.', true);
+        } finally {
+            employeeLoginBtn.disabled = false;
+            employeeLoginBtn.textContent = 'Đăng nhập';
+        }
+    });
+</script>
+</body>
+</html> 

@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lịch Trình Cá Nhân - ShiftPro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
+        .card { background-color: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        .tab-btn { padding: 0.75rem 1.5rem; font-size: 1rem; cursor: pointer; border: none; background: none; transition: all 0.2s ease-in-out; border-bottom: 2px solid transparent; color: #6B7280; }
+        .tab-btn.active { border-bottom-color: #3B82F6; color: #3B82F6; font-weight: 600; }
+        
+        .availability-grid-cell {
+            height: 80px;
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            position: relative;
+        }
+        .availability-grid-cell:hover { background-color: #f0f2f5; }
+        .availability-grid-cell.selected { background-color: #dbeafe; border-color: #93c5fd; }
+        .availability-grid-cell.selected-available { background-color: #dcfce7; border-color: #86efac; }
+        .availability-grid-cell.selected-unavailable { background-color: #fee2e2; border-color: #fca5a5; }
+        
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; position: absolute; top: 8px; right: 8px; }
+        .status-dot.available { background-color: #10b981; } /* Emerald 500 */
+        .status-dot.unavailable { background-color: #ef4444; } /* Red 500 */
+    </style>
+</head>
+<body class="flex justify-center items-center min-h-screen p-4">
+    <script>
+        try {
+            const user = JSON.parse(sessionStorage.getItem('user'));
+            if (!user || (user.role !== 'employee' && user.role !== 'staff')) window.location.href = '/';
+        } catch (e) { window.location.href = '/'; }
+    </script>
+
+    <div class="card w-full max-w-screen-2xl flex flex-col md:flex-row">
+        <!-- Sidebar -->
+        <aside class="w-full md:w-64 bg-gray-800 text-white p-6 rounded-l-xl flex flex-col justify-between hidden md:block">
+            <div>
+                <h2 class="text-3xl font-bold mb-8">ShiftPro</h2>
+                <nav>
+                    <ul>
+                        <li class="mb-4"><a href="#" class="flex items-center text-gray-300 hover:text-blue-400"><i class="fas fa-chart-line mr-3"></i><span>Tổng quan</span></a></li>
+                        <li class="mb-4"><a href="#" class="flex items-center text-gray-300 hover:text-blue-400"><i class="fas fa-calendar-alt mr-3"></i><span>Lịch biểu</span></a></li>
+                        <li class="mb-4"><a href="#" class="flex items-center text-gray-300 hover:text-blue-400"><i class="fas fa-exchange-alt mr-3"></i><span>Yêu cầu đổi ca</span></a></li>
+                        <li class="mb-4"><a href="#" class="flex items-center text-gray-300 hover:text-blue-400"><i class="fas fa-calculator mr-3"></i><span>Tính lương</span></a></li>
+                    </ul>
+                </nav>
+            </div>
+            <p class="text-gray-400 text-sm">Phiên bản 1.0</p>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-6 md:p-8">
+            <header class="flex justify-between items-center mb-6 border-b pb-4">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">Trang cá nhân</h1>
+                    <p class="text-gray-600">Chào mừng, <span id="employee-name-display" class="font-semibold">Bạn</span>!</p>
+                </div>
+                <button id="logout-btn" class="text-gray-500 hover:text-red-500"><i class="fas fa-sign-out-alt mr-2"></i>Đăng xuất</button>
+            </header>
+
+            <div class="flex border-b mb-6">
+                <button id="my-schedule-tab-btn" class="tab-btn active">Lịch làm của tôi</button>
+                <button id="register-availability-tab-btn" class="tab-btn">Đăng ký lịch rảnh</button>
+            </div>
+
+            <!-- My Schedule View -->
+            <div id="my-schedule-view">
+                 <!-- This content remains the same as before -->
+                 <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-800">Lịch làm của bạn trong tuần</h3>
+                    <div class="flex items-center space-x-2">
+                        <button id="my-schedule-prev-week-btn" class="p-2 rounded-full hover:bg-gray-200 transition-colors"><i class="fas fa-chevron-left"></i></button>
+                        <input type="date" id="my-schedule-week-select" class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <span id="my-schedule-current-week-display" class="font-medium text-gray-700"></span>
+                        <button id="my-schedule-next-week-btn" class="p-2 rounded-full hover:bg-gray-200 transition-colors"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div id="my-schedule-list" class="space-y-4"></div>
+            </div>
+
+            <!-- Register Availability View -->
+            <div id="register-availability-view" class="hidden">
+                <div class="flex flex-col lg:flex-row gap-8">
+                    <!-- Left: Grid -->
+                    <div class="flex-1">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-semibold text-gray-800">Lịch cá nhân của bạn</h3>
+                            <div class="flex items-center space-x-2">
+                                <button id="availability-prev-week-btn" class="p-2 rounded-full hover:bg-gray-200"><i class="fas fa-chevron-left"></i></button>
+                                <input type="date" id="availability-week-select" class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <span id="availability-current-week-display" class="font-medium text-gray-700"></span>
+                                <button id="availability-next-week-btn" class="p-2 rounded-full hover:bg-gray-200"><i class="fas fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+                        
+                        <div id="availability-grid" class="grid grid-cols-7 border-t border-l border-gray-200">
+                            <!-- JS will render this -->
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div class="mt-4 flex gap-4">
+                            <button id="preview-changes-btn" class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">Xem trước thay đổi</button>
+                            <button id="save-all-changes-btn" class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Lưu tất cả</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Right: Form for editing individual cell -->
+                    <div class="w-full lg:w-80">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">Chỉnh sửa ca làm</h3>
+                        <div class="bg-gray-50 p-6 rounded-lg">
+                            <p id="form-placeholder" class="text-center text-gray-500">Click vào một ô trong lịch để chỉnh sửa.</p>
+                            <form id="availability-form" class="hidden">
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700">Ngày</label>
+                                    <p id="form-date" class="mt-1 text-lg font-semibold text-gray-900"></p>
+                                </div>
+                                <div class="mb-6">
+                                    <label class="block text-sm font-medium text-gray-700">Ca làm</label>
+                                    <p id="form-shift-type" class="mt-1 text-lg font-semibold text-gray-900"></p>
+                                </div>
+                                <div class="mb-4">
+                                    <label for="availability-notes" class="block text-sm font-medium text-gray-700 mb-2">Ghi chú (tùy chọn)</label>
+                                    <textarea id="availability-notes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Nhập ghi chú nếu cần..."></textarea>
+                                </div>
+                                <p class="text-sm text-gray-600 mb-4">Chọn trạng thái của bạn cho ca làm này:</p>
+                                <div class="flex gap-4 mb-4">
+                                    <label class="flex items-center gap-2">
+                                        <input type="radio" name="availability-status" id="radio-available" value="available" class="form-radio text-green-500" checked>
+                                        <span>Rảnh</span>
+                                    </label>
+                                    <label class="flex items-center gap-2">
+                                        <input type="radio" name="availability-status" id="radio-unavailable" value="unavailable" class="form-radio text-red-500">
+                                        <span>Bận</span>
+                                    </label>
+                                </div>
+                                <button type="button" id="update-cell-btn" class="w-full bg-blue-500 text-white font-bold py-3 rounded-lg hover:bg-blue-600">Cập nhật</button>
+                                <p id="availability-message" class="text-center h-5 mt-4"></p>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Preview Modal -->
+                <div id="preview-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+                    <div class="flex items-center justify-center min-h-screen p-4">
+                        <div class="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto">
+                            <div class="p-6">
+                                <h3 class="text-xl font-semibold mb-4">Xem trước thay đổi</h3>
+                                <div id="preview-content" class="space-y-2">
+                                    <!-- Preview content will be generated here -->
+                                </div>
+                                <div class="flex gap-4 mt-6">
+                                    <button id="confirm-save-btn" class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Xác nhận lưu</button>
+                                    <button id="cancel-preview-btn" class="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">Hủy</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+<script>
+    // --- Constants and Globals ---
+    const API_BASE_URL = 'http://localhost:3002/api';
+    let currentEmployee = null;
+    let currentWeekDate = new Date();
+    let shiftTypes = [];
+    let selectedCell = null;
+    let availabilityMap = new Map(); // Global availability map for notes loading
+    let pendingChanges = new Map(); // Track pending changes before saving
+
+    // --- Element Caching ---
+    const $ = (id) => document.getElementById(id);
+    const elements = {
+        employeeName: $('employee-name-display'),
+        logoutBtn: $('logout-btn'),
+        myScheduleTab: $('my-schedule-tab-btn'),
+        registerAvailabilityTab: $('register-availability-tab-btn'),
+        myScheduleView: $('my-schedule-view'),
+        registerAvailabilityView: $('register-availability-view'),
+        // My Schedule
+        myScheduleList: $('my-schedule-list'),
+        mySchedulePrevWeekBtn: $('my-schedule-prev-week-btn'),
+        myScheduleNextWeekBtn: $('my-schedule-next-week-btn'),
+        myScheduleWeekDisplay: $('my-schedule-current-week-display'),
+        // Availability
+        availabilityGrid: $('availability-grid'),
+        availabilityPrevWeekBtn: $('availability-prev-week-btn'),
+        availabilityNextWeekBtn: $('availability-next-week-btn'),
+        availabilityWeekDisplay: $('availability-current-week-display'),
+        availabilityForm: $('availability-form'),
+        formPlaceholder: $('form-placeholder'),
+        formDate: $('form-date'),
+        formShiftType: $('form-shift-type'),
+        updateCellBtn: $('update-cell-btn'),
+        availabilityMessage: $('availability-message'),
+        availabilityNotes: $('availability-notes'),
+        radioAvailable: $('radio-available'),
+        radioUnavailable: $('radio-unavailable'),
+        previewChangesBtn: $('preview-changes-btn'),
+        saveAllChangesBtn: $('save-all-changes-btn'),
+        previewModal: $('preview-modal'),
+        previewContent: $('preview-content'),
+        confirmSaveBtn: $('confirm-save-btn'),
+        cancelPreviewBtn: $('cancel-preview-btn'),
+    };
+
+    // --- Helper Functions ---
+    const getMonday = (d) => {
+        d = new Date(d);
+        const day = d.getDay(), diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(d.setDate(diff));
+        monday.setHours(0, 0, 0, 0);
+        return monday;
+    };
+    const addDays = (date, days) => {
+        const result = new Date(date);
+        result.setDate(result.getDate() + days);
+        return result;
+    };
+    const formatDate = (date) => new Date(date).toISOString().split('T')[0];
+    const formatTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
+    const showMessage = (el, msg, isError = false) => {
+        el.textContent = msg;
+        el.className = `text-center h-5 mt-4 ${isError ? 'text-red-600' : 'text-green-600'}`;
+        setTimeout(() => el.textContent = '', 3000);
+    };
+    
+    // --- API Calls ---
+    const fetchJson = async (url, options = {}) => {
+        const response = await fetch(url, options);
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'API request failed');
+        }
+        return data;
+    };
+
+    // --- Tab Switching ---
+    elements.myScheduleTab.addEventListener('click', () => {
+        console.log('Step 2: "My Schedule" tab clicked.');
+        elements.myScheduleTab.classList.add('active');
+        elements.registerAvailabilityTab.classList.remove('active');
+        elements.myScheduleView.classList.remove('hidden');
+        elements.registerAvailabilityView.classList.add('hidden');
+        renderMyScheduleView();
+    });
+    elements.registerAvailabilityTab.addEventListener('click', () => {
+        elements.registerAvailabilityTab.classList.add('active');
+        elements.myScheduleTab.classList.remove('active');
+        elements.registerAvailabilityView.classList.remove('hidden');
+        elements.myScheduleView.classList.add('hidden');
+        renderAvailabilityView();
+    });
+
+    // --- "My Schedule" View Logic ---
+    const renderMyScheduleView = async () => {
+        if (!currentEmployee) return;
+        elements.myScheduleList.innerHTML = '<p class="text-center p-8">Đang tải...</p>';
+        const monday = getMonday(currentWeekDate);
+        elements.myScheduleWeekDisplay.textContent = 
+            `${monday.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} - ${addDays(monday, 6).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+
+        try {
+            const apiUrl = `${API_BASE_URL}/shifts?employeeId=${currentEmployee.id}&weekStart=${formatDate(monday)}`;
+            console.log('Step 3: Calling API to get schedule:', apiUrl);
+            const data = await fetchJson(apiUrl);
+            console.log('API call successful, data received:', data);
+            const shifts = data.shifts;
+            if (!shifts || shifts.length === 0) {
+                elements.myScheduleList.innerHTML = '<p class="text-center text-gray-500 p-8">Không có ca làm trong tuần này.</p>';
+                return;
+            }
+            const shiftsByDay = shifts.reduce((acc, shift) => {
+                (acc[shift.start_date] = acc[shift.start_date] || []).push(shift);
+                return acc;
+            }, {});
+            elements.myScheduleList.innerHTML = Object.keys(shiftsByDay).sort().map(dateKey => {
+                const dayShifts = shiftsByDay[dateKey].sort((a,b) => a.start_time.localeCompare(b.start_time));
+                const date = new Date(dateKey + 'T00:00:00');
+                return `
+                    <div class="pt-4 mt-4 border-t first:border-t-0 first:mt-0 first:pt-0">
+                        <h4 class="font-semibold text-lg mb-2">${date.toLocaleDateString('vi-VN', { weekday: 'long' })}, ${date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</h4>
+                        ${dayShifts.map(s => `
+                            <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg flex items-center mb-2">
+                                <div class="w-1 h-10 bg-blue-500 rounded-full mr-4"></div>
+                                <div>
+                                    <div class="font-bold text-blue-800">${s.shift_type}</div>
+                                    <div class="text-sm text-gray-600"><i class="far fa-clock mr-1"></i>${formatTime(s.start_time)} - ${formatTime(s.end_time)}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }).join('');
+        } catch (e) {
+            elements.myScheduleList.innerHTML = `<p class="text-center text-red-500 p-8">Lỗi: ${e.message}</p>`;
+        }
+    };
+    elements.mySchedulePrevWeekBtn.addEventListener('click', () => {
+        currentWeekDate.setDate(currentWeekDate.getDate() - 7);
+        renderMyScheduleView();
+    });
+    elements.myScheduleNextWeekBtn.addEventListener('click', () => {
+        currentWeekDate.setDate(currentWeekDate.getDate() + 7);
+        renderMyScheduleView();
+    });
+
+    // --- "Register Availability" View Logic ---
+    const renderAvailabilityView = async () => {
+        elements.availabilityGrid.innerHTML = '<p class="text-center p-8 col-span-7">Đang tải...</p>';
+        const monday = getMonday(currentWeekDate);
+        elements.availabilityWeekDisplay.textContent = 
+            `${monday.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} - ${addDays(monday, 6).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+        resetForm();
+
+        try {
+            if (shiftTypes.length === 0) {
+                const shiftTypeData = await fetchJson(`${API_BASE_URL}/shift-types`);
+                shiftTypes = shiftTypeData.shiftTypes;
+            }
+            const availabilityData = await fetchJson(`${API_BASE_URL}/employee-availability/${currentEmployee.id}?weekStart=${formatDate(monday)}`);
+            
+            // Clear and populate global availability map for notes loading
+            availabilityMap.clear();
+            availabilityData.availability.forEach(item => {
+                const key = `${formatDate(new Date(item.available_date))}-${item.shift_type_name}`;
+                availabilityMap.set(key, {
+                    is_available: item.is_available,
+                    note: item.note
+                });
+            });
+
+            renderAvailabilityGrid();
+        } catch (e) {
+            elements.availabilityGrid.innerHTML = `<p class="text-center text-red-500 p-8 col-span-7">Lỗi: ${e.message}</p>`;
+        }
+    };
+    
+    const renderAvailabilityGrid = () => {
+        const monday = getMonday(currentWeekDate);
+        const daysOfWeek = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+        let gridHtml = daysOfWeek.map(day => `<div class="p-2 font-semibold text-center text-sm">${day}</div>`).join('');
+        
+        shiftTypes.forEach(st => {
+            for(let i=0; i<7; i++) {
+                const date = addDays(monday, i);
+                const dateStr = formatDate(date);
+                const key = `${dateStr}-${st.type_name}`;
+                const availabilityData = availabilityMap.get(key);
+                const pendingData = pendingChanges.get(key);
+
+                let cellClasses = 'availability-grid-cell flex flex-col items-center justify-center p-1';
+                let statusDot = '';
+                
+                if (pendingData) {
+                    // Show pending changes
+                    if (pendingData.isAvailable) {
+                        cellClasses += ' selected-available';
+                        statusDot = '<div class="status-dot available"></div>';
+                    } else {
+                        cellClasses += ' selected-unavailable';
+                        statusDot = '<div class="status-dot unavailable"></div>';
+                    }
+                } else if (availabilityData) {
+                    // Show existing data
+                    statusDot = `<div class="status-dot ${availabilityData.is_available ? 'available' : 'unavailable'}"></div>`;
+                } else {
+                    // No data - show as neutral (will be marked as unavailable when saving)
+                    cellClasses += ' opacity-50';
+                }
+
+                gridHtml += `
+                    <div class="${cellClasses}" data-date="${dateStr}" data-shift-type-name="${st.type_name}">
+                        <span class="font-medium text-sm text-gray-800">${st.type_name}</span>
+                        <span class="text-xs text-gray-500">${date.toLocaleDateString('vi-VN', {day:'2-digit'})}</span>
+                        ${statusDot}
+                    </div>
+                `;
+            }
+        });
+        
+        elements.availabilityGrid.innerHTML = gridHtml;
+        elements.availabilityGrid.querySelectorAll('.availability-grid-cell').forEach(cell => cell.addEventListener('click', handleCellClick));
+    };
+    
+    function resetForm() {
+        elements.availabilityForm.classList.add('hidden');
+        elements.formPlaceholder.classList.remove('hidden');
+        elements.availabilityNotes.value = '';
+        if (selectedCell) {
+            selectedCell.classList.remove('selected');
+            selectedCell = null;
+        }
+        // Clear temporary data when switching modes
+        pendingChanges.clear();
+    }
+    
+    function handleCellClick(event) {
+        const cell = event.currentTarget;
+        const { date, shiftTypeName } = cell.dataset;
+        
+        // Always open form for editing
+        if(selectedCell) selectedCell.classList.remove('selected');
+        selectedCell = cell;
+        selectedCell.classList.add('selected');
+
+        const dateObj = new Date(date + 'T00:00:00');
+        elements.formDate.textContent = dateObj.toLocaleDateString('vi-VN', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric'});
+        elements.formShiftType.textContent = shiftTypeName;
+        
+        // Load existing notes if available
+        const key = `${date}-${shiftTypeName}`;
+        const existingAvailability = availabilityMap.get(key);
+        if (existingAvailability && existingAvailability.note) {
+            elements.availabilityNotes.value = existingAvailability.note;
+        } else {
+            elements.availabilityNotes.value = '';
+        }
+        
+        // Set radio button based on existing status or pending changes
+        const pendingChange = pendingChanges.get(key);
+        if (pendingChange) {
+            if (pendingChange.isAvailable) {
+                elements.radioAvailable.checked = true;
+            } else {
+                elements.radioUnavailable.checked = true;
+            }
+        } else if (existingAvailability) {
+            if (existingAvailability.is_available) {
+                elements.radioAvailable.checked = true;
+            } else {
+                elements.radioUnavailable.checked = true;
+            }
+        } else {
+            elements.radioAvailable.checked = true;
+        }
+        
+        elements.formPlaceholder.classList.add('hidden');
+        elements.availabilityForm.classList.remove('hidden');
+        elements.availabilityMessage.textContent = '';
+    }
+
+    // --- Xử lý nút Cập nhật cell ---
+    const updateCell = () => {
+        if (!selectedCell) return;
+        const { date, shiftTypeName } = selectedCell.dataset;
+        const notes = elements.availabilityNotes.value.trim();
+        const isAvailable = elements.radioAvailable.checked;
+        
+        const key = `${date}-${shiftTypeName}`;
+        pendingChanges.set(key, {
+            isAvailable: isAvailable,
+            notes: notes || null
+        });
+        
+        // Update visual feedback
+        selectedCell.querySelector('.status-dot')?.remove();
+        const dot = document.createElement('div');
+        dot.className = `status-dot ${isAvailable ? 'available' : 'unavailable'}`;
+        selectedCell.appendChild(dot);
+        
+        showMessage(elements.availabilityMessage, `Đã cập nhật: ${isAvailable ? 'Rảnh' : 'Bận'} cho ${shiftTypeName}`);
+        
+        // Reset form
+        resetForm();
+    };
+    elements.updateCellBtn.addEventListener('click', updateCell);
+
+    elements.availabilityPrevWeekBtn.addEventListener('click', () => {
+        currentWeekDate.setDate(currentWeekDate.getDate() - 7);
+        renderAvailabilityView();
+    });
+    elements.availabilityNextWeekBtn.addEventListener('click', () => {
+        currentWeekDate.setDate(currentWeekDate.getDate() + 7);
+        renderAvailabilityView();
+    });
+
+    // --- Preview and Save Actions ---
+    elements.previewChangesBtn.addEventListener('click', () => {
+        // Tự động thêm "bận" cho các ô chưa được tick
+        const monday = getMonday(currentWeekDate);
+        shiftTypes.forEach(st => {
+            for(let i=0; i<7; i++) {
+                const date = addDays(monday, i);
+                const dateStr = formatDate(date);
+                const key = `${dateStr}-${st.type_name}`;
+                
+                // Nếu chưa có trong pendingChanges và chưa có trong availabilityMap, mặc định là bận
+                if (!pendingChanges.has(key) && !availabilityMap.has(key)) {
+                    pendingChanges.set(key, {
+                        isAvailable: false,
+                        notes: null
+                    });
+                }
+            }
+        });
+
+        // Kiểm tra có thay đổi thực sự không
+        const hasChanges = Array.from(pendingChanges.entries()).some(([key, data]) => {
+            const existingData = availabilityMap.get(key);
+            if (!existingData) {
+                // Nếu chưa có dữ liệu, coi như có thay đổi
+                return true;
+            }
+            // So sánh trạng thái và ghi chú
+            return existingData.is_available !== data.isAvailable || 
+                   existingData.note !== data.notes;
+        });
+
+        if (!hasChanges) {
+            alert('Chưa có thay đổi nào để xem trước.');
+            return;
+        }
+        
+        let previewHtml = '<div class="space-y-3">';
+        const sortedData = Array.from(pendingChanges.entries()).sort();
+        
+        sortedData.forEach(([key, data]) => {
+            const lastHyphenIndex = key.lastIndexOf('-');
+            const date = key.substring(0, lastHyphenIndex);
+            const shiftType = key.substring(lastHyphenIndex + 1);
+
+            const dateObj = new Date(date + 'T00:00:00');
+            const dayName = dateObj.toLocaleDateString('vi-VN', { weekday: 'long' });
+            const dateStr = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+            
+            const existingData = availabilityMap.get(key);
+            const isNewChange = !existingData;
+            const statusChanged = existingData && existingData.is_available !== data.isAvailable;
+            const notesChanged = existingData && existingData.note !== data.notes;
+            
+            let changeIndicator = '';
+            if (isNewChange) {
+                changeIndicator = '<span class="text-blue-600 text-xs">(Mới)</span>';
+            } else if (statusChanged || notesChanged) {
+                changeIndicator = '<span class="text-orange-600 text-xs">(Thay đổi)</span>';
+            }
+            
+            previewHtml += `
+                <div class="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                        <span class="font-medium">${dayName}, ${dateStr}</span>
+                        <span class="text-gray-600 ml-2">- ${shiftType}</span>
+                        ${changeIndicator}
+                        ${data.notes ? `<div class="text-sm text-gray-500 mt-1">Ghi chú: ${data.notes}</div>` : ''}
+                    </div>
+                    <span class="px-3 py-1 rounded-full text-sm font-medium ${
+                        data.isAvailable 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                    }">
+                        ${data.isAvailable ? 'Rảnh' : 'Bận'}
+                    </span>
+                </div>
+            `;
+        });
+        
+        previewHtml += '</div>';
+        elements.previewContent.innerHTML = previewHtml;
+        elements.previewModal.classList.remove('hidden');
+    });
+    
+    elements.confirmSaveBtn.addEventListener('click', async () => {
+        try {
+            // Hiển thị loading
+            elements.confirmSaveBtn.textContent = 'Đang lưu...';
+            elements.confirmSaveBtn.disabled = true;
+            
+            // Tự động thêm "bận" cho các ô chưa được tick (giống như preview)
+            const monday = getMonday(currentWeekDate);
+            shiftTypes.forEach(st => {
+                for(let i=0; i<7; i++) {
+                    const date = addDays(monday, i);
+                    const dateStr = formatDate(date);
+                    const key = `${dateStr}-${st.type_name}`;
+                    
+                    // Nếu chưa có trong pendingChanges và chưa có trong availabilityMap, mặc định là bận
+                    if (!pendingChanges.has(key) && !availabilityMap.has(key)) {
+                        pendingChanges.set(key, {
+                            isAvailable: false,
+                            notes: null
+                        });
+                    }
+                }
+            });
+            
+            let savedCount = 0;
+            const totalCount = pendingChanges.size;
+            
+            // Save all pending changes
+            for (const [key, data] of pendingChanges.entries()) {
+                const lastHyphenIndex = key.lastIndexOf('-');
+                const date = key.substring(0, lastHyphenIndex);
+                const shiftType = key.substring(lastHyphenIndex + 1);
+                
+                await fetchJson(`${API_BASE_URL}/employee-availability/upsert`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        employeeId: currentEmployee.id,
+                        availableDate: date,
+                        shiftTypeName: shiftType,
+                        isAvailable: data.isAvailable,
+                        notes: data.notes
+                    })
+                });
+                savedCount++;
+                
+                // Cập nhật availabilityMap
+                availabilityMap.set(key, {
+                    is_available: data.isAvailable,
+                    note: data.notes
+                });
+            }
+            
+            // Clear pending changes and refresh
+            pendingChanges.clear();
+            elements.previewModal.classList.add('hidden');
+            showMessage(elements.availabilityMessage, `Đã lưu thành công ${savedCount}/${totalCount} thay đổi!`);
+            
+            // Refresh grid để hiển thị dữ liệu mới
+            renderAvailabilityGrid();
+            
+        } catch (e) {
+            showMessage(elements.availabilityMessage, `Lỗi khi lưu: ${e.message}`, true);
+        } finally {
+            // Reset button
+            elements.confirmSaveBtn.textContent = 'Xác nhận lưu';
+            elements.confirmSaveBtn.disabled = false;
+        }
+    });
+    
+    elements.cancelPreviewBtn.addEventListener('click', () => {
+        elements.previewModal.classList.add('hidden');
+    });
+    
+    elements.saveAllChangesBtn.addEventListener('click', () => {
+        elements.previewChangesBtn.click(); // Trigger preview first
+    });
+
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', () => {
+        try {
+            const userString = sessionStorage.getItem('user');
+            if (!userString) throw new Error('No user session');
+            currentEmployee = JSON.parse(userString);
+            if (!currentEmployee || !currentEmployee.id || (currentEmployee.role !== 'employee' && currentEmployee.role !== 'staff')) {
+                throw new Error('Invalid user role');
+            }
+            console.log('Step 1: Employee data loaded successfully.', currentEmployee);
+            elements.employeeName.textContent = currentEmployee.name;
+        } catch (e) {
+            console.error('Failed to load employee data, redirecting to login.', e);
+            window.location.href = '/';
+            return;
+        }
+        
+        elements.logoutBtn.addEventListener('click', () => {
+            sessionStorage.removeItem('user');
+            window.location.href = '/';
+        });
+
+        elements.myScheduleTab.click(); // Initial view
+
+        const myScheduleWeekSelect = document.getElementById('my-schedule-week-select');
+        const availabilityWeekSelect = document.getElementById('availability-week-select');
+
+        function updateMyScheduleWeekUI() {
+            myScheduleWeekSelect.value = formatDate(getMonday(currentWeekDate));
+            elements.myScheduleWeekDisplay.textContent = `${getMonday(currentWeekDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} - ${addDays(getMonday(currentWeekDate), 6).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+        }
+        function updateAvailabilityWeekUI() {
+            availabilityWeekSelect.value = formatDate(getMonday(currentWeekDate));
+            elements.availabilityWeekDisplay.textContent = `${getMonday(currentWeekDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} - ${addDays(getMonday(currentWeekDate), 6).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+        }
+        myScheduleWeekSelect.addEventListener('change', () => {
+            const selected = new Date(myScheduleWeekSelect.value);
+            currentWeekDate = getMonday(selected);
+            updateMyScheduleWeekUI();
+            renderMyScheduleView();
+        });
+        availabilityWeekSelect.addEventListener('change', () => {
+            const selected = new Date(availabilityWeekSelect.value);
+            currentWeekDate = getMonday(selected);
+            updateAvailabilityWeekUI();
+            renderAvailabilityView();
+        });
+        elements.mySchedulePrevWeekBtn.addEventListener('click', () => {
+            currentWeekDate.setDate(currentWeekDate.getDate() - 7);
+            updateMyScheduleWeekUI();
+            renderMyScheduleView();
+        });
+        elements.myScheduleNextWeekBtn.addEventListener('click', () => {
+            currentWeekDate.setDate(currentWeekDate.getDate() + 7);
+            updateMyScheduleWeekUI();
+            renderMyScheduleView();
+        });
+        elements.availabilityPrevWeekBtn.addEventListener('click', () => {
+            currentWeekDate.setDate(currentWeekDate.getDate() - 7);
+            updateAvailabilityWeekUI();
+            renderAvailabilityView();
+        });
+        elements.availabilityNextWeekBtn.addEventListener('click', () => {
+            currentWeekDate.setDate(currentWeekDate.getDate() + 7);
+            updateAvailabilityWeekUI();
+            renderAvailabilityView();
+        });
+    });
+</script>
+</body>
+</html>

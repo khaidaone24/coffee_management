@@ -1,0 +1,1831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống quản lý ca làm việc nhân viên</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+        }
+        .sidebar {
+            background-color: #28282D; /* Darker color from the new image */
+            color: white;
+        }
+        .sidebar-item.active {
+            background-color: #3A3A40; /* Slightly lighter dark for active state */
+            border-left: 4px solid #FBC02D; /* Yellow highlight */
+        }
+        .card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        /* Adjusted shift-block positioning context */
+        #shift-grid {
+            min-height: 900px !important;
+            min-width: 100%;
+            background: #f8fafc !important;
+            position: relative;
+        }
+        #shift-grid > .col-span-1:not(:first-child) { /* Target day columns, not time label column */
+            position: relative; /* Make day columns positioning context for their shifts */
+            min-height: 900px !important;
+            background: #f8fafc;
+        }
+
+        .shift-block {
+            min-height: 40px;
+            background: #e0e7ef;
+            border: 1px solid #b6c2d1;
+            color: #222;
+            opacity: 1 !important;
+            border-radius: 8px;
+            padding: 0.5rem; /* Reduced padding to fit more content */
+            margin-bottom: 0.25rem; /* Reduced margin */
+            cursor: pointer; /* To indicate it's clickable for details */
+            box-sizing: border-box; /* Include padding and border in element's total width and height */
+            overflow: hidden; /* Hide overflow if content is too large */
+            font-size: 0.75rem; /* Smaller font size to fit more content */
+            line-height: 1.2; /* Tighter line height */
+        }
+        .shift-block.blue {
+            background-color: #EEF8FF;
+            border-color: #BEE3F8;
+            color: #2B6CB0;
+        }
+        .shift-block.orange {
+            background-color: #FFF3E0;
+            border-color: #FFCC80;
+            color: #F57C00;
+        }
+        .shift-block.purple {
+            background-color: #F3E5F5;
+            border-color: #CE93D8;
+            color: #8E24AA;
+        }
+        .shift-block.green {
+            background-color: #F0FFF4;
+            border-color: #9AE6B4;
+            color: #2F855A;
+        }
+        .shift-block.red {
+            background-color: #FEF5E7;
+            border-color: #FBD38D;
+            color: #C05621;
+        }
+        .shift-block.teal {
+            background-color: #E6FFFA;
+            border-color: #81E6D9;
+            color: #2C7A7B;
+        }
+        
+        .time-slot {
+            border-top: 1px dashed #E0E0E0;
+            box-sizing: border-box;
+            display: flex;
+            align-items: flex-start;
+            padding-left: 1rem;
+            color: #718096;
+            font-size: 0.875rem;
+        }
+        .employee-list-item {
+            cursor: pointer;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        .employee-list-item:hover {
+            background-color: #f0f2f5;
+        }
+        .employee-list-item.selected {
+            background-color: #e2e8f0;
+            font-weight: 600;
+        }
+        .assigned-employee-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1px; /* Reduced margin */
+            white-space: nowrap; /* Prevent wrapping for small names */
+            font-size: 0.7rem; /* Even smaller font for employee names */
+        }
+        .assigned-employee-item:last-child {
+            margin-bottom: 0;
+        }
+        /* Ensure shift blocks take full width of their grid cell */
+        .shift-block {
+            width: calc(100% - 0.5rem); /* Account for half of gap if any */
+            left: 0.25rem; /* Adjust to center within the grid gap */
+            right: 0.25rem;
+            margin: 0; /* Remove default margin that could push it */
+        }
+
+        /* Employee count badge */
+        .employee-count-badge {
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #374151;
+            font-size: 0.65rem;
+            font-weight: bold;
+            padding: 0.1rem 0.3rem;
+            border-radius: 4px;
+            margin-left: 0.25rem;
+        }
+
+        /* Employee view improvements */
+        .employee-shift-card {
+            border-left: 4px solid #3B82F6;
+            background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+        }
+        .employee-shift-card.morning {
+            border-left-color: #F59E0B;
+        }
+        .employee-shift-card.afternoon {
+            border-left-color: #10B981;
+        }
+        .employee-shift-card.evening {
+            border-left-color: #8B5CF6;
+        }
+        .employee-shift-card.night {
+            border-left-color: #1F2937;
+        }
+
+        /* Shift type indicator */
+        .shift-type-indicator {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Empty time slot styles */
+        .shift-block.empty-slot {
+            background: #fffbe6 !important;
+            border: 2px dashed #fbbf24 !important;
+            color: #b45309 !important;
+            opacity: 1 !important;
+            cursor: default;
+            transition: all 0.2s ease;
+        }
+        .shift-block.empty-slot:hover {
+            opacity: 0.9;
+            background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%) !important;
+        }
+        .shift-block.empty-slot .text-center {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            text-align: center;
+        }
+
+        /* Custom Modal Styles */
+        #custom-alert-modal {
+            background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent overlay */
+            transition: opacity 0.2s ease-in-out;
+        }
+        #custom-alert-modal.hidden {
+            opacity: 0;
+            pointer-events: none; /* Disable interaction when hidden */
+        }
+        #custom-alert-modal > div { /* Modal content box */
+            transform: translateY(-20px);
+            transition: transform 0.2s ease-in-out;
+        }
+        #custom-alert-modal:not(.hidden) > div {
+            transform: translateY(0);
+        }
+
+    </style>
+</head>
+<body class="flex">
+    <script>
+        try {
+            const user = JSON.parse(sessionStorage.getItem('user'));
+            if (!user || user.role !== 'manager') {
+                // If no user or user is not a manager, redirect to login
+                window.location.href = '/';
+            }
+        } catch (e) {
+            // If parsing fails, something is wrong, redirect to login
+            window.location.href = '/';
+        }
+    </script>
+    <!-- Sidebar -->
+    <aside class="sidebar w-64 p-6 flex flex-col rounded-r-xl">
+        <div class="flex items-center mb-10 pl-4">
+            <i class="fas fa-bars text-xl mr-4"></i>
+            <span class="text-2xl font-bold">Shift</span>
+        </div>
+
+        <nav class="flex-grow">
+            <ul>
+                <li class="mb-2">
+                    <a href="#" id="view-timetable-btn" class="sidebar-item flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                        <i class="fas fa-boxes mr-3"></i>
+                        Xem lịch biểu
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" id="view-employee-btn" class="sidebar-item active flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                        <i class="fas fa-users mr-3"></i>
+                        Xem theo nhân viên
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" id="view-salary-btn" class="sidebar-item flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                        <i class="fas fa-money-bill-wave mr-3"></i>
+                        Báo cáo lương
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="sidebar-item flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                        <i class="fas fa-chart-bar mr-3"></i>
+                        Báo cáo
+                    </a>
+                </li>
+            </ul>
+
+            <h3 class="text-sm font-semibold mt-8 mb-4 opacity-75 uppercase tracking-wider pl-3">Mục khác</h3>
+            <ul>
+                <li class="mb-2">
+                    <a href="#" class="sidebar-item flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                        <i class="fas fa-list-alt mr-3"></i>
+                        Mục 5
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="sidebar-item flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                        <i class="fas fa-list-alt mr-3"></i>
+                        Mục 6
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="sidebar-item flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                        <i class="fas fa-list-alt mr-3"></i>
+                        Mục 7
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="sidebar-item flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                        <i class="fas fa-list-alt mr-3"></i>
+                        Mục 8
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="sidebar-item flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                        <i class="fas fa-list-alt mr-3"></i>
+                        Mục 9
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="sidebar-item flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                        <i class="fas fa-list-alt mr-3"></i>
+                        Mục 10
+                    </a>
+                </li>
+            </ul>
+
+            <h3 class="text-sm font-semibold mt-8 mb-4 opacity-75 uppercase tracking-wider pl-3">Cài đặt</h3>
+            <ul>
+                <li class="mb-2">
+                    <a href="#" class="sidebar-item flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                        <i class="fas fa-cog mr-3"></i>
+                        Cài đặt
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-6 flex">
+        <!-- Shift Schedule Section (Timetable View) -->
+        <section id="timetable-view" class="flex-grow mr-6">
+            <header class="flex justify-between items-center mb-6">
+                <div class="flex items-center space-x-4">
+                    <span class="text-gray-600 font-medium">Lịch biểu tuần</span>
+                    <div class="card p-3 text-sm font-semibold flex items-center space-x-2">
+                        <i class="fas fa-calendar-week text-blue-500"></i>
+                        <span id="week-display" class="text-gray-700">Đang tải...</span>
+                    </div>
+                    <input type="date" id="timetable-week-select" class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ml-2">
+                    <button id="timetable-prev-week-btn" class="ml-2 p-2 rounded-full hover:bg-gray-200"><i class="fas fa-chevron-left"></i></button>
+                    <button id="timetable-next-week-btn" class="p-2 rounded-full hover:bg-gray-200"><i class="fas fa-chevron-right"></i></button>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="card p-3 text-sm font-semibold flex items-center space-x-2">
+                        <i class="fas fa-clock text-purple-500"></i>
+                        <span id="total-hours-display" class="text-gray-700">--</span>
+                    </div>
+                    <div class="card p-3 text-sm font-semibold flex items-center space-x-2">
+                        <i class="fas fa-user-check text-orange-500"></i>
+                        <span id="assigned-employees-display" class="text-gray-700">--</span>
+                    </div>
+                    <!-- Auto Schedule Button - Restored -->
+                    <button id="auto-schedule-btn" class="bg-blue-500 text-white px-4 py-2 rounded-full flex items-center space-x-2 hover:bg-blue-600 transition-colors duration-200">
+                        <i class="fas fa-magic"></i>
+                        <span>Xếp lịch tự động</span>
+                    </button>
+                    <button id="clear-schedule-btn" class="bg-red-500 text-white px-4 py-2 rounded-full flex items-center space-x-2 hover:bg-red-600 transition-colors duration-200">
+                        <i class="fas fa-trash"></i>
+                        <span>Xóa lịch tuần</span>
+                    </button>
+                </div>
+            </header>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="grid grid-cols-8 gap-4 relative" id="shift-grid">
+                    <!-- Day headers, time labels, and shifts are rendered dynamically by JavaScript -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Employee View Section (Initially hidden) -->
+        <section id="employee-view" class="flex-grow mr-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Lịch trình theo nhân viên</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Employee List -->
+                <div class="card p-6 col-span-1">
+                    <h3 class="text-lg font-semibold mb-4">Danh sách nhân viên</h3>
+                    <ul id="employee-list">
+                        <!-- Employee items will be loaded here -->
+                    </ul>
+                </div>
+                <!-- Employee's Shifts -->
+                <div class="card p-6 col-span-2">
+                    <h3 class="text-lg font-semibold mb-4" id="selected-employee-shifts-title">Chọn một nhân viên để xem lịch trình</h3>
+                    <div id="employee-shifts-details" class="space-y-4">
+                        <!-- Shifts for selected employee will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Salary Report Section -->
+        <section id="salary-view" class="flex-grow mr-6 hidden">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Báo cáo lương tuần</h2>
+            
+            <!-- Week Selection -->
+            <div class="card p-4 mb-6">
+                <div class="flex items-center space-x-4">
+                    <label for="salary-week-select" class="text-sm font-medium text-gray-700">Chọn tuần:</label>
+                    <input type="date" id="salary-week-select" class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button id="calculate-salary-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors duration-200">
+                        <i class="fas fa-calculator mr-2"></i>
+                        Tính lương
+                    </button>
+                </div>
+            </div>
+
+            <!-- Salary Summary -->
+            <div id="salary-summary" class="card p-6 mb-6 hidden">
+                <h3 class="text-lg font-semibold mb-4">Tổng kết lương tuần</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="text-center p-4 bg-blue-50 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-600" id="total-hours-summary">0</div>
+                        <div class="text-sm text-gray-600">Tổng giờ</div>
+                    </div>
+                    <div class="text-center p-4 bg-green-50 rounded-lg">
+                        <div class="text-2xl font-bold text-green-600" id="weekday-hours-summary">0</div>
+                        <div class="text-sm text-gray-600">Giờ ngày thường (22/h)</div>
+                    </div>
+                    <div class="text-center p-4 bg-orange-50 rounded-lg">
+                        <div class="text-2xl font-bold text-orange-600" id="weekend-hours-summary">0</div>
+                        <div class="text-sm text-gray-600">Giờ cuối tuần (25/h)</div>
+                    </div>
+                    <div class="text-center p-4 bg-purple-50 rounded-lg">
+                        <div class="text-2xl font-bold text-purple-600" id="total-salary-summary">0đ</div>
+                        <div class="text-sm text-gray-600">Tổng lương</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Employee Salary Details -->
+            <div id="salary-details" class="space-y-4 hidden">
+                <!-- Employee salary cards will be loaded here -->
+            </div>
+        </section>
+
+        <!-- Right Panel for Shift Details (remains active for creating/editing) -->
+        <aside class="w-96 bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">Tạo ca làm mới</h2>
+
+            <div class="mb-4">
+                <label for="shiftType" class="block text-sm font-medium text-gray-700 mb-2">Loại ca làm</label>
+                <select id="shiftType" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <!-- Options will be loaded from DB -->
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label for="startDate" class="block text-sm font-medium text-gray-700 mb-2">Ngày</label>
+                <input type="date" id="startDate" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div class="mb-4">
+                <label for="startTime" class="block text-sm font-medium text-gray-700 mb-2">Thời gian bắt đầu</label>
+                <input type="time" id="startTime" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div class="mb-4">
+                <label for="endTime" class="block text-sm font-medium text-gray-700 mb-2">Thời gian kết thúc</label>
+                <input type="time" id="endTime" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <!-- Break Time Inputs -->
+            <div class="mb-4">
+                <label for="breakStartTime" class="block text-sm font-medium text-gray-700 mb-2">Bắt đầu nghỉ (Tùy chọn)</label>
+                <input type="time" id="breakStartTime" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="mb-4">
+                <label for="breakEndTime" class="block text-sm font-medium text-gray-700 mb-2">Kết thúc nghỉ (Tùy chọn)</label>
+                <input type="time" id="breakEndTime" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Người được giao</label>
+                <div class="flex flex-wrap gap-2 mb-2" id="assigned-employees-display">
+                    <!-- Assigned employees will be displayed here -->
+                </div>
+                <button id="add-employee-to-shift-btn" class="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-gray-300 transition-colors duration-200">
+                    <i class="fas fa-plus"></i>
+                    <span>Thêm nhân viên</span>
+                </button>
+            </div>
+
+            <div class="mb-6">
+                <label for="notes" class="block text-sm font-medium text-gray-700 mb-2">Ghi chú (Tùy chọn)</label>
+                <textarea id="notes" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Thêm ghi chú..."></textarea>
+            </div>
+            
+            <input type="hidden" id="editing-shift-id">
+            <div id="form-buttons" class="space-y-2">
+                <button id="save-shift-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-200">
+                    Lưu ca làm
+                </button>
+                <button id="delete-shift-btn" class="w-full bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-red-700 transition-colors duration-200 hidden">
+                    Xóa ca làm
+                </button>
+                <button id="clear-form-btn" class="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors duration-200 hidden">
+                    Hủy / Tạo ca mới
+                </button>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Employee Selection Modal -->
+    <div id="employee-selection-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-96">
+            <h3 class="text-xl font-bold mb-4">Chọn nhân viên</h3>
+            <div class="mb-4">
+                <input type="text" id="employee-search-input" placeholder="Tìm kiếm nhân viên..." class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div id="modal-employee-list" class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 mb-4">
+                <!-- Employees will be loaded here -->
+            </div>
+            <div class="flex justify-end space-x-4">
+                <button id="cancel-employee-selection" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Hủy</button>
+                <button id="confirm-employee-selection" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Alert/Confirm Modal -->
+    <div id="custom-alert-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-80">
+            <h3 id="custom-alert-title" class="text-xl font-bold mb-4">Thông báo</h3>
+            <p id="custom-alert-message" class="text-gray-700 mb-6"></p>
+            <div class="flex justify-end space-x-4">
+                <button id="custom-alert-ok-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">OK</button>
+                <button id="custom-alert-cancel-btn" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 hidden">Hủy</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shift Detail Modal -->
+    <div id="shift-detail-modal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl p-8 relative">
+            <button id="close-shift-detail-modal" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+            <h2 class="text-2xl font-bold mb-4">Chi tiết ca làm</h2>
+            <div id="shift-detail-content">
+                <!-- Nội dung chi tiết ca sẽ được render bằng JS -->
+            </div>
+            <div class="flex justify-end gap-4 mt-6">
+                <button id="save-shift-detail-btn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-semibold">Lưu thay đổi</button>
+                <button id="delete-shift-detail-btn" class="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 font-semibold">Xóa ca</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API_BASE_URL: Cần khớp với cổng server của bạn (VD: 3000, 3002)
+        const API_BASE_URL = 'http://localhost:3002/api'; // Đã cập nhật thành 3002
+
+        let currentView = 'timetable'; // 'timetable' hoặc 'employee'
+        let selectedEmployeeId = null;
+        let allEmployees = []; // Cache all employees
+        let selectedEmployeesForShift = []; // For creating a new shift
+        let loadedShiftTypes = []; // Stores shift types fetched from backend
+
+        const timetableView = document.getElementById('timetable-view');
+        const employeeView = document.getElementById('employee-view'); 
+        const salaryView = document.getElementById('salary-view');
+        const viewTimetableBtn = document.getElementById('view-timetable-btn');
+        const viewEmployeeBtn = document.getElementById('view-employee-btn');
+        const viewSalaryBtn = document.getElementById('view-salary-btn');
+        const shiftGrid = document.getElementById('shift-grid');
+        const employeeListUl = document.getElementById('employee-list');
+        const selectedEmployeeShiftsTitle = document.getElementById('selected-employee-shifts-title');
+        const employeeShiftsDetails = document.getElementById('employee-shifts-details');
+
+        const saveShiftBtn = document.getElementById('save-shift-btn');
+        const autoScheduleBtn = document.getElementById('auto-schedule-btn');
+        const clearScheduleBtn = document.getElementById('clear-schedule-btn');
+        const addEmployeeToShiftBtn = document.getElementById('add-employee-to-shift-btn'); 
+        const assignedEmployeesDisplay = document.getElementById('assigned-employees-display');
+
+        const employeeSelectionModal = document.getElementById('employee-selection-modal');
+        const modalEmployeeList = document.getElementById('modal-employee-list');
+        const employeeSearchInput = document.getElementById('employee-search-input');
+        const cancelEmployeeSelection = document.getElementById('cancel-employee-selection');
+        const confirmEmployeeSelection = document.getElementById('confirm-employee-selection');
+
+        const shiftTypeSelect = document.getElementById('shiftType');
+        const startDateInput = document.getElementById('startDate');
+        const startTimeInput = document.getElementById('startTime');
+        const endTimeInput = document.getElementById('endTime');
+        const breakStartTimeInput = document.getElementById('breakStartTime');
+        const breakEndTimeInput = document.getElementById('breakEndTime');
+        const notesInput = document.getElementById('notes');
+
+        // New modal elements
+        const customAlertModal = document.getElementById('custom-alert-modal');
+        const customAlertTitle = document.getElementById('custom-alert-title');
+        const customAlertMessage = document.getElementById('custom-alert-message');
+        const customAlertOkBtn = document.getElementById('custom-alert-ok-btn');
+        const customAlertCancelBtn = document.getElementById('custom-alert-cancel-btn');
+
+        // Header display elements
+        const weekDisplay = document.getElementById('week-display');
+        const totalShiftsDisplay = document.getElementById('total-shifts-display');
+        const totalHoursDisplay = document.getElementById('total-hours-display');
+        const headerAssignedEmployeesDisplay = document.getElementById('assigned-employees-display');
+
+        // Salary view elements
+        const salaryWeekSelect = document.getElementById('salary-week-select');
+        const calculateSalaryBtn = document.getElementById('calculate-salary-btn');
+        const salarySummary = document.getElementById('salary-summary');
+        const salaryDetails = document.getElementById('salary-details');
+        const totalHoursSummary = document.getElementById('total-hours-summary');
+        const weekdayHoursSummary = document.getElementById('weekday-hours-summary');
+        const weekendHoursSummary = document.getElementById('weekend-hours-summary');
+        const totalSalarySummary = document.getElementById('total-salary-summary');
+
+        // Form elements for editing
+        const formTitle = document.getElementById('form-title');
+        const editingShiftIdInput = document.getElementById('editing-shift-id');
+        const deleteShiftBtn = document.getElementById('delete-shift-btn');
+        const clearFormBtn = document.getElementById('clear-form-btn');
+
+        // Đặt biến này ở đầu script, ngoài mọi function
+        globalThis.currentTimetableWeek = getMonday(new Date());
+
+        // Helper function to format time
+        function formatTime(timeString) {
+            if (!timeString) return '';
+            try {
+                const [hours, minutes] = timeString.split(':');
+                const date = new Date();
+                date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            } catch (e) {
+                console.error("Error formatting time:", timeString, e);
+                return timeString;
+            }
+        }
+
+        // Helper function to get day of week in Vietnamese
+        function getDayOfWeek(dateString) {
+            const date = new Date(dateString);
+            const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+            return days[date.getDay()];
+        }
+
+        // Custom Alert function
+        function showCustomAlert(message, title = "Thông báo") {
+            if (!customAlertModal || !customAlertTitle || !customAlertMessage || !customAlertOkBtn || !customAlertCancelBtn) {
+                console.error("Missing custom alert modal elements. Falling back to browser alert.");
+                alert(title + ":\n" + message);
+                return;
+            }
+            customAlertTitle.textContent = title;
+            customAlertMessage.textContent = message;
+            customAlertCancelBtn.classList.add('hidden'); // Hide cancel button for alert
+            customAlertOkBtn.onclick = () => {
+                customAlertModal.classList.add('hidden');
+            };
+            customAlertModal.classList.remove('hidden');
+        }
+
+        // Custom Confirm function
+        function showCustomConfirm(message, title = "Xác nhận") {
+            return new Promise((resolve) => {
+                if (!customAlertModal || !customAlertTitle || !customAlertMessage || !customAlertOkBtn || !customAlertCancelBtn) {
+                    console.error("Missing custom confirm modal elements. Falling back to browser confirm.");
+                    resolve(confirm(title + ":\n" + message));
+                    return;
+                }
+                customAlertTitle.textContent = title;
+                customAlertMessage.textContent = message;
+                customAlertCancelBtn.classList.remove('hidden'); // Show cancel button for confirm
+
+                const handleOk = () => {
+                    customAlertModal.classList.add('hidden');
+                    customAlertOkBtn.removeEventListener('click', handleOk);
+                    customAlertCancelBtn.removeEventListener('click', handleCancel);
+                    resolve(true); 
+                };
+                const handleCancel = () => {
+                    customAlertModal.classList.add('hidden');
+                    customAlertOkBtn.removeEventListener('click', handleOk);
+                    customAlertCancelBtn.removeEventListener('click', handleCancel);
+                    resolve(false); 
+                };
+
+                customAlertOkBtn.addEventListener('click', handleOk);
+                customAlertCancelBtn.addEventListener('click', handleCancel);
+                customAlertModal.classList.remove('hidden');
+            });
+        }
+
+        // Helper function to get current week range
+        function getCurrentWeekRange() {
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+            const weekStart = new Date(today.setDate(diff));
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            
+            return {
+                start: weekStart.toISOString().split('T')[0],
+                end: weekEnd.toISOString().split('T')[0],
+                startDate: weekStart,
+                endDate: weekEnd
+            };
+        }
+
+        // Helper function to update header statistics
+        function updateHeaderStatistics(shifts) {
+            if (!weekDisplay || !totalShiftsDisplay || !totalHoursDisplay || !headerAssignedEmployeesDisplay) {
+                return;
+            }
+            weekDisplay.textContent = `${currentTimetableWeek.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} - ${addDays(currentTimetableWeek, 6).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+
+            // Update shifts count
+            const totalShifts = shifts.length;
+            totalShiftsDisplay.textContent = `${totalShifts} ca làm`;
+
+            // Update total hours
+            const totalHours = shifts.reduce((total, shift) => {
+                if (shift.start_date && shift.start_time && shift.end_date && shift.end_time) {
+                    const durationHours = ((new Date(`${shift.end_date}T${shift.end_time}`) - new Date(`${shift.start_date}T${shift.start_time}`)) / (1000 * 60 * 60));
+                    return total + (isNaN(durationHours) ? 0 : durationHours);
+                }
+                return total;
+            }, 0);
+            totalHoursDisplay.textContent = `${totalHours.toFixed(1)} giờ`;
+
+            // Update assigned employees count
+            const uniqueEmployees = new Set();
+            shifts.forEach(shift => {
+                if (shift.assigned_employees && shift.assigned_employees.length > 0) {
+                    shift.assigned_employees.forEach(emp => {
+                        if (emp && emp.id) {
+                            uniqueEmployees.add(emp.id);
+                        }
+                    });
+                }
+            });
+            headerAssignedEmployeesDisplay.textContent = `${uniqueEmployees.size} nhân viên`;
+        }
+
+        // Function to format currency
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('vi-VN', {
+                style: 'currency',
+                currency: 'VND',
+                minimumFractionDigits: 0
+            }).format(amount);
+        }
+
+        // Function to calculate salary for a week
+        async function calculateSalary(weekStart) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/salary/calculate?weekStart=${weekStart}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.message);
+                }
+
+                return data;
+            } catch (error) {
+                console.error('Lỗi khi tính lương:', error);
+                showCustomAlert('Có lỗi xảy ra khi tính lương.', "Lỗi");
+                return null;
+            }
+        }
+
+        // Function to render salary summary
+        function renderSalarySummary(totals) {
+            if (!totalHoursSummary || !weekdayHoursSummary || !weekendHoursSummary || !totalSalarySummary) {
+                return;
+            }
+
+            totalHoursSummary.textContent = totals.totalHours.toFixed(1);
+            weekdayHoursSummary.textContent = totals.weekdayHours.toFixed(1);
+            weekendHoursSummary.textContent = totals.weekendHours.toFixed(1);
+            totalSalarySummary.textContent = formatCurrency(totals.totalSalary);
+
+            if (salarySummary) {
+                salarySummary.classList.remove('hidden');
+            }
+        }
+
+        // Function to render employee salary details
+        function renderEmployeeSalaryDetails(salaryData) {
+            if (!salaryDetails) {
+                return;
+            }
+
+            salaryDetails.innerHTML = '';
+            salaryDetails.classList.remove('hidden');
+
+            salaryData.forEach(employee => {
+                const employeeCard = document.createElement('div');
+                employeeCard.className = 'card p-6';
+                
+                const weekdaySalary = formatCurrency(employee.weekdaySalary);
+                const weekendSalary = formatCurrency(employee.weekendSalary);
+                const totalSalary = formatCurrency(employee.totalSalary);
+
+                employeeCard.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h4 class="text-lg font-semibold text-gray-800">${employee.employeeName}</h4>
+                            <p class="text-sm text-gray-600">Mã NV: ${employee.employeeCode}</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-bold text-blue-600">${totalSalary}</div>
+                            <div class="text-sm text-gray-500">Tổng lương tuần</div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div class="text-center p-3 bg-blue-50 rounded-lg">
+                            <div class="text-lg font-bold text-blue-600">${employee.totalHours.toFixed(1)}h</div>
+                            <div class="text-xs text-gray-600">Tổng giờ</div>
+                        </div>
+                        <div class="text-center p-3 bg-green-50 rounded-lg">
+                            <div class="text-lg font-bold text-green-600">${employee.weekdayHours.toFixed(1)}h</div>
+                            <div class="text-xs text-gray-600">Ngày thường (22/h)</div>
+                            <div class="text-xs font-medium text-green-700">${weekdaySalary}</div>
+                        </div>
+                        <div class="text-center p-3 bg-orange-50 rounded-lg">
+                            <div class="text-lg font-bold text-orange-600">${employee.weekendHours.toFixed(1)}h</div>
+                            <div class="text-xs text-gray-600">Cuối tuần (25/h)</div>
+                            <div class="text-xs font-medium text-orange-700">${weekendSalary}</div>
+                        </div>
+                    </div>
+
+                    <div class="border-t pt-4">
+                        <h5 class="font-semibold text-gray-700 mb-2">Chi tiết ca làm:</h5>
+                        <div class="space-y-2 max-h-40 overflow-y-auto">
+                            ${employee.shifts.map(shift => {
+                                const shiftDate = new Date(shift.startDate).toLocaleDateString('vi-VN');
+                                const shiftSalary = formatCurrency(shift.salary);
+                                const shiftType = shift.isWeekend ? 'Cuối tuần' : 'Ngày thường';
+                                const rate = shift.isWeekend ? '25/h' : '22/h';
+                                
+                                return `
+                                    <div class="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                                        <div>
+                                            <span class="font-medium">${shift.shiftType}</span>
+                                            <span class="text-gray-500"> - ${shiftDate} ${shift.startTime}-${shift.endTime}</span>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="font-medium">${shift.durationHours.toFixed(1)}h (${rate})</div>
+                                            <div class="text-blue-600">${shiftSalary}</div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+
+                salaryDetails.appendChild(employeeCard);
+            });
+        }
+
+        // Function to fetch shift types from backend and populate dropdown
+        async function fetchShiftTypesAndPopulateDropdown() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/shift-types`);
+                console.log(`[Fetch] Gọi API: ${API_BASE_URL}/shift-types`);
+                console.log(`[Fetch] Trạng thái phản hồi: ${response.status}`);
+                console.log(`[Fetch] Content-Type: ${response.headers.get('Content-Type')}`);
+
+                if (!response.ok) {
+                    const errorText = await response.text(); 
+                    throw new Error(`Lỗi HTTP: ${response.status} - ${errorText}`);
+                }
+
+                const data = await response.json(); 
+                if (data.success) {
+                    loadedShiftTypes = data.shiftTypes;
+                    if (shiftTypeSelect) shiftTypeSelect.innerHTML = ''; 
+                    loadedShiftTypes.forEach(type => {
+                        const option = document.createElement('option');
+                        option.value = type.type_name;
+                        option.textContent = `${type.type_name} (${formatTime(type.default_start_time)}-${formatTime(type.default_end_time)})`;
+                        if (shiftTypeSelect) shiftTypeSelect.appendChild(option);
+                    });
+                    if (loadedShiftTypes.length > 0) {
+                        updateShiftFormTimes(loadedShiftTypes[0]);
+                    }
+                } else {
+                    console.error('Lỗi khi tải các loại ca làm:', data.message);
+                }
+            } catch (error) {
+                console.error('Lỗi network hoặc parse JSON khi tải các loại ca làm:', error);
+            }
+        }
+
+        // Update form fields based on selected shift type
+        function updateShiftFormTimes(selectedType) {
+            if (startDateInput) startDateInput.value = new Date().toISOString().split('T')[0]; // Set current date as default
+            if (startTimeInput) startTimeInput.value = selectedType.default_start_time || '';
+            if (endTimeInput) endTimeInput.value = selectedType.default_end_time || '';
+            if (breakStartTimeInput) breakStartTimeInput.value = selectedType.default_break_start_time || '';
+            if (breakEndTimeInput) breakEndTimeInput.value = selectedType.default_break_end_time || '';
+        }
+
+        // Function to render shifts in Timetable View
+        async function renderTimetableShifts() {
+            const shiftGrid = document.getElementById('shift-grid');
+            console.log('[DEBUG] Gọi renderTimetableShifts với tuần:', formatDate(currentTimetableWeek));
+            if (!shiftGrid) {
+                console.error("Element with ID 'shift-grid' not found. Cannot render timetable shifts.");
+                return;
+            }
+            try {
+                shiftGrid.innerHTML = '';
+                // 1. Render header ngày
+                const headerFragment = document.createDocumentFragment();
+                headerFragment.appendChild(document.createElement('div'));
+                const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+                days.forEach(day => {
+                    const headerCell = document.createElement('div');
+                    headerCell.className = 'text-center text-sm font-medium text-gray-500 pb-4';
+                    headerCell.textContent = day;
+                    headerFragment.appendChild(headerCell);
+                });
+                shiftGrid.appendChild(headerFragment);
+                // 2. Render cột giờ
+                const gridStartHour = 8;
+                const gridEndHour = 22;
+                const pixelsPerHour = 60;
+                const timeLabelColumn = document.createElement('div');
+                timeLabelColumn.className = 'col-span-1';
+                for (let hour = gridStartHour; hour < gridEndHour; hour++) {
+                    const timeSlot = document.createElement('div');
+                    timeSlot.className = 'time-slot';
+                    timeSlot.style.height = `${pixelsPerHour}px`;
+                    timeSlot.innerHTML = `<span style="transform: translateY(-50%); background: #f0f2f5; padding: 0 4px;">${String(hour).padStart(2, '0')}:00</span>`;
+                    if (hour === gridStartHour) timeSlot.style.borderTop = 'none';
+                    timeLabelColumn.appendChild(timeSlot);
+                }
+                const finalBorder = document.createElement('div');
+                finalBorder.className = 'time-slot';
+                finalBorder.style.height = '0px';
+                timeLabelColumn.appendChild(finalBorder);
+                shiftGrid.appendChild(timeLabelColumn);
+                // 3. Render 7 cột ngày
+                for (let i = 0; i < 7; i++) {
+                    const dayColumn = document.createElement('div');
+                    dayColumn.className = 'col-span-1 relative';
+                    dayColumn.dataset.dayIndex = (i === 6) ? 7 : (i + 1);
+                    shiftGrid.appendChild(dayColumn);
+                }
+                // Helper cho time
+                const timeToMinutes = (timeStr) => {
+                    if (!timeStr || !timeStr.includes(':')) return 0;
+                    const [hours, minutes] = timeStr.split(':').map(Number);
+                    return hours * 60 + minutes;
+                };
+                const minutesToTime = (minutes) => {
+                    const h = Math.floor(minutes / 60).toString().padStart(2, '0');
+                    const m = (minutes % 60).toString().padStart(2, '0');
+                    return `${h}:${m}`;
+                };
+                // Block trống
+                const renderEmptyBlock = (container, startTimeMinutes, durationMinutes) => {
+                    if (durationMinutes <= 1) return;
+                    const gridStartMinute = gridStartHour * 60;
+                    const topPosition = ((startTimeMinutes - gridStartMinute) / 60) * pixelsPerHour;
+                    const height = (durationMinutes / 60) * pixelsPerHour;
+                    const emptyBlock = document.createElement('div');
+                    emptyBlock.classList.add('shift-block', 'empty-slot');
+                    const startTimeStr = minutesToTime(startTimeMinutes);
+                    const endTimeStr = minutesToTime(startTimeMinutes + durationMinutes);
+                    emptyBlock.innerHTML = `
+                        <div class="text-center">
+                            <div class="text-xs font-medium mb-1">⏰ ${startTimeStr}-${endTimeStr}</div>
+                            <div class="text-xs">Chưa gán người làm việc</div>
+                        </div>
+                    `;
+                    emptyBlock.style.position = 'absolute';
+                    emptyBlock.style.top = `${topPosition}px`;
+                    emptyBlock.style.height = `${height}px`;
+                    emptyBlock.style.zIndex = 1;
+                    container.appendChild(emptyBlock);
+                };
+                // Block ca làm
+                const renderShiftBlock = (container, shift, zIndex) => {
+                    const shiftStartTime = timeToMinutes(shift.start_time);
+                    const shiftEndTime = timeToMinutes(shift.end_time);
+                    const shiftDurationMinutes = shiftEndTime - shiftStartTime;
+                    const shiftBlock = document.createElement('div');
+                    shiftBlock.classList.add('shift-block');
+                    const colors = ['blue', 'orange', 'purple', 'green', 'red', 'teal'];
+                    shiftBlock.classList.add(colors[shift.id % colors.length]);
+                    const assignedEmployees = (shift.assigned_employees || []).filter(emp => emp && emp.id);
+                    let assignedEmployeesHtml = '<div class="text-xs text-gray-500 mt-1">❌ Chưa gán</div>';
+                    if (assignedEmployees.length > 0) {
+                        const displayEmployees = assignedEmployees.slice(0, 3);
+                        const remainingCount = assignedEmployees.length - 3;
+                        assignedEmployeesHtml = `
+                            <div class="mt-1">
+                                <div class="text-xs font-semibold text-current">👥 ${assignedEmployees.length} người:</div>
+                                ${displayEmployees.map(emp => `<div class="assigned-employee-item"><span>• ${emp.name}</span></div>`).join('')}
+                                ${remainingCount > 0 ? `<div class="assigned-employee-item text-xs">+${remainingCount} người khác</div>` : ''}
+                            </div>`;
+                    }
+                    shiftBlock.innerHTML = `
+                        <div class="font-semibold text-xs">${shift.shift_type}</div>
+                        <div class="text-xs text-current">🕐 ${formatTime(shift.start_time)}-${formatTime(shift.end_time)}</div>
+                        <div class="text-xs text-current">⏱️ ${(shiftDurationMinutes / 60).toFixed(1)}h</div>
+                        ${(shift.break_start_time && shift.break_end_time) ? `<div class="text-xs text-current mt-1">⏸️ ${formatTime(shift.break_start_time)}-${formatTime(shift.break_end_time)}</div>` : ''}
+                        ${assignedEmployeesHtml}
+                    `;
+                    const gridStartMinute = gridStartHour * 60;
+                    const topPosition = ((shiftStartTime - gridStartMinute) / 60) * pixelsPerHour;
+                    const height = Math.max((shiftDurationMinutes / 60) * pixelsPerHour, 80);
+                    shiftBlock.style.position = 'absolute';
+                    shiftBlock.style.top = `${topPosition}px`;
+                    shiftBlock.style.height = `${height}px`;
+                    shiftBlock.style.zIndex = zIndex + 10;
+                    shiftBlock.addEventListener('click', () => openShiftDetailModal(shift));
+                    container.appendChild(shiftBlock);
+                };
+                // 4. Lấy shifts tuần này
+                const weekStart = formatDate(currentTimetableWeek);
+                let shiftsToRender = [];
+                try {
+                    const response = await fetch(`${API_BASE_URL}/shifts?weekStart=${weekStart}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success && Array.isArray(data.shifts)) {
+                            shiftsToRender = data.shifts;
+                        }
+                    }
+                } catch (e) { console.error(e); }
+                updateHeaderStatistics(shiftsToRender);
+                // 5. Gom ca theo ngày
+                const shiftsByDay = {};
+                shiftsToRender.forEach(shift => {
+                    const date = new Date(shift.start_date);
+                    const dayOfWeek = date.getDay();
+                    const targetColIndex = (dayOfWeek === 0) ? 7 : dayOfWeek;
+                    if (!shiftsByDay[targetColIndex]) shiftsByDay[targetColIndex] = [];
+                    shiftsByDay[targetColIndex].push(shift);
+                });
+                // 6. Render block cho từng ngày và từng khung giờ
+                const mainBlocks = [
+                    { name: 'Sáng', start: 8 * 60, end: 13 * 60 },
+                    { name: 'Chiều', start: 13 * 60, end: 17 * 60 },
+                    { name: 'Tối', start: 17 * 60, end: 22 * 60 }
+                ];
+                for (let dayIndex = 1; dayIndex <= 7; dayIndex++) {
+                    const dayColumnDiv = shiftGrid.querySelector(`div[data-day-index="${dayIndex}"]`);
+                    if (!dayColumnDiv) continue;
+                    const dayShifts = (shiftsByDay[dayIndex] || []);
+                    mainBlocks.forEach(block => {
+                        const shiftsInBlock = dayShifts
+                            .filter(shift => {
+                                const shiftStart = timeToMinutes(shift.start_time);
+                                const shiftEnd = timeToMinutes(shift.end_time);
+                                return Math.max(shiftStart, block.start) < Math.min(shiftEnd, block.end);
+                            })
+                            .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
+                        if (shiftsInBlock.length === 0) {
+                            renderEmptyBlock(dayColumnDiv, block.start, block.end - block.start);
+                        } else {
+                            let lastEndTime = block.start;
+                            shiftsInBlock.forEach((shift, index) => {
+                                const shiftStart = timeToMinutes(shift.start_time);
+                                const shiftEnd = timeToMinutes(shift.end_time);
+                                if (shiftStart > lastEndTime) {
+                                    renderEmptyBlock(dayColumnDiv, lastEndTime, shiftStart - lastEndTime);
+                                }
+                                renderShiftBlock(dayColumnDiv, shift, index);
+                                lastEndTime = Math.max(lastEndTime, shiftEnd);
+                            });
+                            if (block.end > lastEndTime) {
+                                renderEmptyBlock(dayColumnDiv, lastEndTime, block.end - lastEndTime);
+                            }
+                        }
+                    });
+                }
+                // 7. Log debug
+                const dayCols = shiftGrid.querySelectorAll('[data-day-index]');
+                const emptyBlocks = shiftGrid.querySelectorAll('.empty-slot');
+                const shiftBlocks = shiftGrid.querySelectorAll('.shift-block:not(.empty-slot)');
+                console.log('[DEBUG] Tổng số cột ngày:', dayCols.length);
+                console.log('[DEBUG] Tổng số block empty-slot:', emptyBlocks.length);
+                console.log('[DEBUG] Tổng số block shift:', shiftBlocks.length);
+                console.log('[DEBUG] shiftGrid DOM:', shiftGrid.innerHTML);
+            } catch (err) {
+                console.error('[ERROR] renderTimetableShifts:', err);
+            }
+        }
+
+        // Function to render employee list for Employee View (Now with shift counts)
+        async function loadEmployeeList() {
+            if (!employeeListUl) {
+                console.error("Element with ID 'employee-list' not found. Cannot load employee list.");
+                return;
+            }
+            employeeListUl.innerHTML = '<li class="text-gray-500 p-3">Đang tải...</li>';
+            try {
+                const response = await fetch(`${API_BASE_URL}/employees`);
+                if (!response.ok) {
+                    throw new Error(`Lỗi HTTP: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                if (data.success && data.employees) {
+                    allEmployees = data.employees;
+                    employeeListUl.innerHTML = ''; 
+
+                    if (allEmployees.length === 0) {
+                        employeeListUl.innerHTML = '<li class="text-gray-500 p-3">Không có nhân viên nào để hiển thị.</li>';
+                        return;
+                    }
+                    
+                    // The data from API now includes shift_count and total_hours
+                    allEmployees.forEach(employee => {
+                        const li = document.createElement('li');
+                        li.className = 'employee-list-item flex items-center justify-between p-3 text-gray-800 hover:bg-gray-50 transition-colors duration-200';
+                        li.dataset.employeeId = employee.id;
+                        
+                        li.innerHTML = `
+                            <div class="flex items-center space-x-4">
+                                <img src="https://placehold.co/40x40/D1D5DB/4B5563?text=${employee.name ? employee.name[0] : '?'}" class="rounded-full"/>
+                                <div>
+                                    <div class="font-medium text-gray-900">${employee.name}</div>
+                                    <div class="text-sm text-gray-500">ID: ${employee.employee_id}</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm font-semibold text-blue-600">${employee.shift_count} ca</div>
+                                <div class="text-xs text-gray-500">${Number(employee.total_hours).toFixed(1)} giờ</div>
+                            </div>
+                        `;
+                        
+                        li.addEventListener('click', () => selectEmployee(employee.id, employee.name)); 
+                        employeeListUl.appendChild(li);
+                    });
+                } else {
+                    employeeListUl.innerHTML = `<li class="text-red-500 p-3">Lỗi tải nhân viên: ${data.message || 'Không rõ'}</li>`;
+                }
+            } catch (error) {
+                console.error('Lỗi khi tải danh sách nhân viên:', error);
+                employeeListUl.innerHTML = '<li class="text-red-500 p-3">Không thể kết nối tới server để tải danh sách nhân viên.</li>';
+            }
+        }
+
+    // ====================================================================
+    // KHÔI PHỤC CÁC HÀM VÀ EVENT LISTENERS BỊ THIẾU
+    // ====================================================================
+    
+    // Function to handle selecting an employee from the list in Employee View
+    async function selectEmployee(employeeId, employeeName) {
+        if (!employeeShiftsDetails || !selectedEmployeeShiftsTitle) return;
+
+        // Highlight selected employee in the list
+        document.querySelectorAll('#employee-list li').forEach(li => {
+            li.classList.remove('bg-blue-100', 'font-semibold');
+            if (li.dataset.employeeId == employeeId) {
+                li.classList.add('bg-blue-100', 'font-semibold');
+            }
+        });
+
+        selectedEmployeeId = employeeId;
+        selectedEmployeeShiftsTitle.textContent = `Lịch trình của ${employeeName}`;
+        employeeShiftsDetails.innerHTML = '<div class="text-gray-500">Đang tải ca làm...</div>';
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/shifts?employeeId=${employeeId}`);
+            if (!response.ok) throw new Error('Failed to fetch shifts');
+            
+            const data = await response.json();
+            if (data.success && data.shifts.length > 0) {
+                employeeShiftsDetails.innerHTML = '';
+                data.shifts.sort((a,b) => new Date(a.start_date) - new Date(b.start_date)).forEach(shift => {
+                    const shiftCard = document.createElement('div');
+                    const shiftDate = new Date(shift.start_date).toLocaleDateString('vi-VN');
+                    let durationHours = ((new Date(`${shift.end_date}T${shift.end_time}`) - new Date(`${shift.start_date}T${shift.start_time}`)) / (1000 * 60 * 60));
+                    if (shift.break_start_time && shift.break_end_time) {
+                        const breakHours = ((new Date(`${shift.start_date}T${shift.break_end_time}`) - new Date(`${shift.start_date}T${shift.break_start_time}`)) / (1000 * 60 * 60));
+                        durationHours -= breakHours;
+                    }
+
+                    shiftCard.className = 'employee-shift-card p-4 rounded-lg shadow-sm';
+                    if (shift.shift_type.toLowerCase().includes('sáng')) shiftCard.classList.add('morning');
+                    else if (shift.shift_type.toLowerCase().includes('chiều')) shiftCard.classList.add('afternoon');
+                    else if (shift.shift_type.toLowerCase().includes('tối')) shiftCard.classList.add('evening');
+                    
+                    shiftCard.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="font-bold text-gray-800">${shift.shift_type}</div>
+                                <div class="text-sm text-gray-600">${shiftDate}</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-semibold text-gray-700">${formatTime(shift.start_time)} - ${formatTime(shift.end_time)}</div>
+                                <div class="text-sm text-blue-600 font-medium">${durationHours.toFixed(1)} giờ</div>
+                            </div>
+                        </div>
+                        ${shift.notes ? `<p class="mt-2 text-sm text-gray-500">Ghi chú: ${shift.notes}</p>` : ''}
+                    `;
+                    employeeShiftsDetails.appendChild(shiftCard);
+                });
+            } else {
+                employeeShiftsDetails.innerHTML = '<div class="text-gray-500">Nhân viên này chưa có ca làm nào trong tuần.</div>';
+            }
+        } catch (error) {
+            console.error("Error fetching employee shifts:", error);
+            employeeShiftsDetails.innerHTML = '<div class="text-red-500">Lỗi khi tải ca làm.</div>';
+        }
+    }
+    
+    // Function to populate the form for editing a shift
+    function populateFormForEdit(shift) {
+        document.querySelector('aside.w-96 h2').textContent = "Chỉnh sửa ca làm";
+        editingShiftIdInput.value = shift.id;
+        shiftTypeSelect.value = shift.shift_type;
+        startDateInput.value = shift.start_date;
+        startTimeInput.value = shift.start_time;
+        endTimeInput.value = shift.end_time;
+        notesInput.value = shift.notes || '';
+        breakStartTimeInput.value = shift.break_start_time || '';
+        breakEndTimeInput.value = shift.break_end_time || '';
+        selectedEmployeesForShift = [...(shift.assigned_employees || [])];
+        updateAssignedEmployeesDisplay();
+        deleteShiftBtn.classList.remove('hidden');
+        clearFormBtn.classList.remove('hidden');
+    }
+    
+    // Function to clear the form and reset to "Create" mode
+    function clearForm() {
+        document.querySelector('aside.w-96 h2').textContent = "Tạo ca làm mới";
+        editingShiftIdInput.value = '';
+        if (loadedShiftTypes.length > 0) {
+            shiftTypeSelect.selectedIndex = 0;
+            const firstShiftType = loadedShiftTypes[0];
+            updateShiftFormTimes(firstShiftType);
+        }
+        notesInput.value = '';
+        selectedEmployeesForShift = [];
+        updateAssignedEmployeesDisplay();
+        deleteShiftBtn.classList.add('hidden');
+        clearFormBtn.classList.add('hidden');
+    }
+
+    // Function to update the display of assigned employees in the form
+    function updateAssignedEmployeesDisplay() {
+        assignedEmployeesDisplay.innerHTML = '';
+        selectedEmployeesForShift.forEach(emp => {
+            if (emp && emp.name) {
+                const empTag = document.createElement('div');
+                empTag.className = 'bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded flex items-center';
+                empTag.innerHTML = `
+                    ${emp.name}
+                    <button data-employee-id="${emp.id}" class="remove-employee-from-shift-btn ml-2 text-blue-600 hover:text-blue-800">&times;</button>
+                `;
+                assignedEmployeesDisplay.appendChild(empTag);
+            }
+        });
+    }
+    
+    // Function to switch between Timetable, Employee, and Salary views
+    function switchView(view, callback) {
+        currentView = view;
+        timetableView.classList.add('hidden');
+        employeeView.classList.add('hidden');
+        salaryView.classList.add('hidden');
+        document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+
+        if (view === 'timetable') {
+            timetableView.classList.remove('hidden');
+            viewTimetableBtn.classList.add('active');
+            renderTimetableShifts();
+            if (typeof callback === 'function') callback();
+        } else if (view === 'employee') {
+            employeeView.classList.remove('hidden');
+            viewEmployeeBtn.classList.add('active');
+            loadEmployeeList();
+            if (typeof callback === 'function') callback();
+        } else if (view === 'salary') {
+            salaryView.classList.remove('hidden');
+            viewSalaryBtn.classList.add('active');
+            if (typeof callback === 'function') callback();
+        }
+    }
+    
+    // ====================================================================
+    // MAIN EVENT LISTENERS WIRING
+    // ====================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- View Switching Logic ---
+        viewTimetableBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchView('timetable');
+            renderTimetableShifts();
+        });
+        viewEmployeeBtn.addEventListener('click', (e) => { e.preventDefault(); switchView('employee'); });
+        viewSalaryBtn.addEventListener('click', (e) => { e.preventDefault(); switchView('salary'); });
+        
+        // --- Shift Form Logic ---
+        shiftTypeSelect.addEventListener('change', (e) => {
+            const selectedTypeName = e.target.value;
+            const selectedType = loadedShiftTypes.find(t => t.type_name === selectedTypeName);
+            if (selectedType) {
+                updateShiftFormTimes(selectedType);
+            }
+        });
+
+        saveShiftBtn.addEventListener('click', async () => {
+            const shiftId = editingShiftIdInput.value;
+            const shiftType = shiftTypeSelect.value;
+            const startDate = startDateInput.value;
+            const startTime = startTimeInput.value;
+            const endTime = endTimeInput.value;
+            const notes = notesInput.value;
+            const breakStartTime = breakStartTimeInput.value || null;
+            const breakEndTime = breakEndTimeInput.value || null;
+            const employeeIds = selectedEmployeesForShift.filter(emp => emp && emp.id).map(emp => emp.id);
+
+            if (!startDate || !startTime || !endTime || !shiftType) {
+                showCustomAlert('Vui lòng điền đầy đủ Loại ca, Ngày và Thời gian.', "Thiếu thông tin");
+                return;
+            }
+            
+            const shiftData = {
+                shiftType, startDate, startTime,
+                endDate: startDate, // Assuming same day shift
+                endTime, employeeIds, notes,
+                breakStartTime, breakEndTime
+            };
+
+            try {
+                const url = shiftId ? `${API_BASE_URL}/shifts/${shiftId}` : `${API_BASE_URL}/shifts`;
+                const method = shiftId ? 'PUT' : 'POST';
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(shiftData),
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showCustomAlert(shiftId ? 'Đã cập nhật ca làm thành công!' : 'Đã tạo ca làm thành công!', 'Thành công');
+                    clearForm();
+                    if (currentView === 'timetable') renderTimetableShifts();
+                    if (currentView === 'employee' && selectedEmployeeId) selectEmployee(selectedEmployeeId, allEmployees.find(e => e.id == selectedEmployeeId)?.name);
+
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                showCustomAlert(`Lỗi khi lưu ca làm: ${error.message}`, 'Lỗi');
+            }
+        });
+
+        deleteShiftBtn.addEventListener('click', async () => {
+            const shiftId = editingShiftIdInput.value;
+            if (!shiftId) return;
+
+            const confirmed = await showCustomConfirm('Bạn có chắc chắn muốn xóa ca làm này không?', 'Xác nhận');
+            if (confirmed) {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/shifts/${shiftId}`, { method: 'DELETE' });
+                    const data = await response.json();
+                    if (data.success) {
+                        showCustomAlert('Đã xóa ca làm thành công.', 'Thành công');
+                        clearForm();
+                        renderTimetableShifts();
+                    } else {
+                        throw new Error(data.message);
+                    }
+                } catch (error) {
+                    showCustomAlert(`Lỗi khi xóa ca làm: ${error.message}`, 'Lỗi');
+                }
+            }
+        });
+        
+        clearFormBtn.addEventListener('click', clearForm);
+
+        // --- Employee Selection Modal Logic ---
+        function renderEmployeeSelectionModal() {
+            modalEmployeeList.innerHTML = '';
+            allEmployees.forEach(emp => {
+                const isSelected = selectedEmployeesForShift.some(selected => selected.id === emp.id);
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-2 hover:bg-gray-100 rounded';
+                item.innerHTML = `
+                    <label for="emp-check-${emp.id}" class="flex items-center cursor-pointer w-full">
+                        <img src="https://placehold.co/32x32/E2E8F0/4A5562?text=${emp.name[0]}" class="rounded-full mr-3"/>
+                        <span>${emp.name}</span>
+                    </label>
+                    <input type="checkbox" id="emp-check-${emp.id}" data-employee-id="${emp.id}" class="form-checkbox h-5 w-5 text-blue-600" ${isSelected ? 'checked' : ''}>
+                `;
+                modalEmployeeList.appendChild(item);
+            });
+        }
+        addEmployeeToShiftBtn.addEventListener('click', () => {
+            renderEmployeeSelectionModal();
+            employeeSelectionModal.classList.remove('hidden');
+        });
+        cancelEmployeeSelection.addEventListener('click', () => employeeSelectionModal.classList.add('hidden'));
+        confirmEmployeeSelection.addEventListener('click', () => {
+            selectedEmployeesForShift = [];
+            const checkboxes = modalEmployeeList.querySelectorAll('input[type="checkbox"]:checked');
+            checkboxes.forEach(cb => {
+                const employee = allEmployees.find(emp => emp.id == cb.dataset.employeeId);
+                if (employee) selectedEmployeesForShift.push(employee);
+            });
+            updateAssignedEmployeesDisplay();
+            employeeSelectionModal.classList.add('hidden');
+        });
+        employeeSearchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('#modal-employee-list div').forEach(item => {
+                const name = item.textContent.toLowerCase();
+                item.style.display = name.includes(searchTerm) ? 'flex' : 'none';
+            });
+        });
+        assignedEmployeesDisplay.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-employee-from-shift-btn')) {
+                const employeeIdToRemove = e.target.dataset.employeeId;
+                selectedEmployeesForShift = selectedEmployeesForShift.filter(emp => emp.id != employeeIdToRemove);
+                updateAssignedEmployeesDisplay();
+            }
+        });
+        
+        // --- Schedule-wide Actions ---
+        clearScheduleBtn.addEventListener('click', async () => {
+            const confirmed = await showCustomConfirm('Bạn có chắc chắn muốn xóa tất cả các ca làm việc trong tuần này? Hành động này không thể hoàn tác.', 'Xác nhận xóa');
+            if (confirmed) {
+                const weekRange = getCurrentWeekRange();
+                try {
+                    const response = await fetch(`${API_BASE_URL}/schedule/clear`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ weekStart: weekRange.start })
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        showCustomAlert(data.message, 'Thành công');
+                        renderTimetableShifts();
+                    } else { throw new Error(data.message); }
+                } catch (error) {
+                    showCustomAlert(`Lỗi khi xóa lịch: ${error.message}`, 'Lỗi');
+                }
+            }
+        });
+        
+        autoScheduleBtn.addEventListener('click', async () => {
+            const confirmed = await showCustomConfirm('Hệ thống sẽ tự động xếp lịch cho tuần hiện tại. Các ca làm hiện có sẽ bị xóa. Bạn có muốn tiếp tục?', 'Xác nhận xếp lịch tự động');
+            if (confirmed) {
+                const weekRange = getCurrentWeekRange();
+                try {
+                    const response = await fetch(`${API_BASE_URL}/schedule/auto`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ weekStart: weekRange.start })
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        showCustomAlert(data.message, 'Hoàn thành');
+                        renderTimetableShifts();
+                    } else { throw new Error(data.message); }
+                } catch (error) {
+                    showCustomAlert(`Lỗi khi xếp lịch tự động: ${error.message}`, 'Lỗi');
+                }
+            }
+        });
+
+        // --- Salary Calculation ---
+        calculateSalaryBtn.addEventListener('click', async () => {
+            const weekStart = salaryWeekSelect.value;
+            if (!weekStart) {
+                showCustomAlert('Vui lòng chọn ngày bắt đầu tuần để tính lương.', 'Thiếu thông tin');
+                return;
+            }
+            const salaryDataResponse = await calculateSalary(weekStart);
+            if (salaryDataResponse) {
+                renderSalarySummary(salaryDataResponse.totals);
+                renderEmployeeSalaryDetails(salaryDataResponse.salaryData);
+            }
+        });
+        
+        // --- Initial Page Load ---
+        const weekRange = getCurrentWeekRange();
+        salaryWeekSelect.value = weekRange.start;
+        fetchShiftTypesAndPopulateDropdown();
+        switchView('employee'); // Default to employee view on load
+
+        let currentTimetableWeek = getMonday(new Date());
+        const timetableWeekSelect = document.getElementById('timetable-week-select');
+        const timetablePrevWeekBtn = document.getElementById('timetable-prev-week-btn');
+        const timetableNextWeekBtn = document.getElementById('timetable-next-week-btn');
+
+        function updateTimetableWeekUI() {
+            timetableWeekSelect.value = formatDate(currentTimetableWeek);
+            weekDisplay.textContent = `${currentTimetableWeek.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} - ${addDays(currentTimetableWeek, 6).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+        }
+
+        timetableWeekSelect.addEventListener('change', () => {
+            const selected = new Date(timetableWeekSelect.value);
+            currentTimetableWeek = getMonday(selected);
+            updateTimetableWeekUI();
+            renderTimetableShifts();
+        });
+        timetablePrevWeekBtn.addEventListener('click', () => {
+            currentTimetableWeek.setDate(currentTimetableWeek.getDate() - 7);
+            updateTimetableWeekUI();
+            renderTimetableShifts();
+        });
+        timetableNextWeekBtn.addEventListener('click', () => {
+            currentTimetableWeek.setDate(currentTimetableWeek.getDate() + 7);
+            updateTimetableWeekUI();
+            renderTimetableShifts();
+        });
+
+        // Sửa renderTimetableShifts để truyền đúng weekStart
+        async function renderTimetableShifts() {
+            const shiftGrid = document.getElementById('shift-grid');
+            console.log('[DEBUG] Gọi renderTimetableShifts với tuần:', formatDate(currentTimetableWeek));
+            if (!shiftGrid) {
+                console.error("Element with ID 'shift-grid' not found. Cannot render timetable shifts.");
+                return;
+            }
+            try {
+                shiftGrid.innerHTML = '';
+                // 1. Render header ngày
+                const headerFragment = document.createDocumentFragment();
+                headerFragment.appendChild(document.createElement('div'));
+                const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+                days.forEach(day => {
+                    const headerCell = document.createElement('div');
+                    headerCell.className = 'text-center text-sm font-medium text-gray-500 pb-4';
+                    headerCell.textContent = day;
+                    headerFragment.appendChild(headerCell);
+                });
+                shiftGrid.appendChild(headerFragment);
+                // 2. Render cột giờ
+                const gridStartHour = 8;
+                const gridEndHour = 22;
+                const pixelsPerHour = 60;
+                const timeLabelColumn = document.createElement('div');
+                timeLabelColumn.className = 'col-span-1';
+                for (let hour = gridStartHour; hour < gridEndHour; hour++) {
+                    const timeSlot = document.createElement('div');
+                    timeSlot.className = 'time-slot';
+                    timeSlot.style.height = `${pixelsPerHour}px`;
+                    timeSlot.innerHTML = `<span style="transform: translateY(-50%); background: #f0f2f5; padding: 0 4px;">${String(hour).padStart(2, '0')}:00</span>`;
+                    if (hour === gridStartHour) timeSlot.style.borderTop = 'none';
+                    timeLabelColumn.appendChild(timeSlot);
+                }
+                const finalBorder = document.createElement('div');
+                finalBorder.className = 'time-slot';
+                finalBorder.style.height = '0px';
+                timeLabelColumn.appendChild(finalBorder);
+                shiftGrid.appendChild(timeLabelColumn);
+                // 3. Render 7 cột ngày
+                for (let i = 0; i < 7; i++) {
+                    const dayColumn = document.createElement('div');
+                    dayColumn.className = 'col-span-1 relative';
+                    dayColumn.dataset.dayIndex = (i === 6) ? 7 : (i + 1);
+                    shiftGrid.appendChild(dayColumn);
+                }
+                // Helper cho time
+                const timeToMinutes = (timeStr) => {
+                    if (!timeStr || !timeStr.includes(':')) return 0;
+                    const [hours, minutes] = timeStr.split(':').map(Number);
+                    return hours * 60 + minutes;
+                };
+                const minutesToTime = (minutes) => {
+                    const h = Math.floor(minutes / 60).toString().padStart(2, '0');
+                    const m = (minutes % 60).toString().padStart(2, '0');
+                    return `${h}:${m}`;
+                };
+                // Block trống
+                const renderEmptyBlock = (container, startTimeMinutes, durationMinutes) => {
+                    if (durationMinutes <= 1) return;
+                    const gridStartMinute = gridStartHour * 60;
+                    const topPosition = ((startTimeMinutes - gridStartMinute) / 60) * pixelsPerHour;
+                    const height = (durationMinutes / 60) * pixelsPerHour;
+                    const emptyBlock = document.createElement('div');
+                    emptyBlock.classList.add('shift-block', 'empty-slot');
+                    const startTimeStr = minutesToTime(startTimeMinutes);
+                    const endTimeStr = minutesToTime(startTimeMinutes + durationMinutes);
+                    emptyBlock.innerHTML = `
+                        <div class="text-center">
+                            <div class="text-xs font-medium mb-1">⏰ ${startTimeStr}-${endTimeStr}</div>
+                            <div class="text-xs">Chưa gán người làm việc</div>
+                        </div>
+                    `;
+                    emptyBlock.style.position = 'absolute';
+                    emptyBlock.style.top = `${topPosition}px`;
+                    emptyBlock.style.height = `${height}px`;
+                    emptyBlock.style.zIndex = 1;
+                    container.appendChild(emptyBlock);
+                };
+                // Block ca làm
+                const renderShiftBlock = (container, shift, zIndex) => {
+                    const shiftStartTime = timeToMinutes(shift.start_time);
+                    const shiftEndTime = timeToMinutes(shift.end_time);
+                    const shiftDurationMinutes = shiftEndTime - shiftStartTime;
+                    const shiftBlock = document.createElement('div');
+                    shiftBlock.classList.add('shift-block');
+                    const colors = ['blue', 'orange', 'purple', 'green', 'red', 'teal'];
+                    shiftBlock.classList.add(colors[shift.id % colors.length]);
+                    const assignedEmployees = (shift.assigned_employees || []).filter(emp => emp && emp.id);
+                    let assignedEmployeesHtml = '<div class="text-xs text-gray-500 mt-1">❌ Chưa gán</div>';
+                    if (assignedEmployees.length > 0) {
+                        const displayEmployees = assignedEmployees.slice(0, 3);
+                        const remainingCount = assignedEmployees.length - 3;
+                        assignedEmployeesHtml = `
+                            <div class="mt-1">
+                                <div class="text-xs font-semibold text-current">👥 ${assignedEmployees.length} người:</div>
+                                ${displayEmployees.map(emp => `<div class="assigned-employee-item"><span>• ${emp.name}</span></div>`).join('')}
+                                ${remainingCount > 0 ? `<div class="assigned-employee-item text-xs">+${remainingCount} người khác</div>` : ''}
+                            </div>`;
+                    }
+                    shiftBlock.innerHTML = `
+                        <div class="font-semibold text-xs">${shift.shift_type}</div>
+                        <div class="text-xs text-current">🕐 ${formatTime(shift.start_time)}-${formatTime(shift.end_time)}</div>
+                        <div class="text-xs text-current">⏱️ ${(shiftDurationMinutes / 60).toFixed(1)}h</div>
+                        ${(shift.break_start_time && shift.break_end_time) ? `<div class="text-xs text-current mt-1">⏸️ ${formatTime(shift.break_start_time)}-${formatTime(shift.break_end_time)}</div>` : ''}
+                        ${assignedEmployeesHtml}
+                    `;
+                    const gridStartMinute = gridStartHour * 60;
+                    const topPosition = ((shiftStartTime - gridStartMinute) / 60) * pixelsPerHour;
+                    const height = Math.max((shiftDurationMinutes / 60) * pixelsPerHour, 80);
+                    shiftBlock.style.position = 'absolute';
+                    shiftBlock.style.top = `${topPosition}px`;
+                    shiftBlock.style.height = `${height}px`;
+                    shiftBlock.style.zIndex = zIndex + 10;
+                    shiftBlock.addEventListener('click', () => openShiftDetailModal(shift));
+                    container.appendChild(shiftBlock);
+                };
+                // 4. Lấy shifts tuần này
+                const weekStart = formatDate(currentTimetableWeek);
+                let shiftsToRender = [];
+                try {
+                    const response = await fetch(`${API_BASE_URL}/shifts?weekStart=${weekStart}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success && Array.isArray(data.shifts)) {
+                            shiftsToRender = data.shifts;
+                        }
+                    }
+                } catch (e) { console.error(e); }
+                updateHeaderStatistics(shiftsToRender);
+                // 5. Gom ca theo ngày
+                const shiftsByDay = {};
+                shiftsToRender.forEach(shift => {
+                    const date = new Date(shift.start_date);
+                    const dayOfWeek = date.getDay();
+                    const targetColIndex = (dayOfWeek === 0) ? 7 : dayOfWeek;
+                    if (!shiftsByDay[targetColIndex]) shiftsByDay[targetColIndex] = [];
+                    shiftsByDay[targetColIndex].push(shift);
+                });
+                // 6. Render block cho từng ngày và từng khung giờ
+                const mainBlocks = [
+                    { name: 'Sáng', start: 8 * 60, end: 13 * 60 },
+                    { name: 'Chiều', start: 13 * 60, end: 17 * 60 },
+                    { name: 'Tối', start: 17 * 60, end: 22 * 60 }
+                ];
+                for (let dayIndex = 1; dayIndex <= 7; dayIndex++) {
+                    const dayColumnDiv = shiftGrid.querySelector(`div[data-day-index="${dayIndex}"]`);
+                    if (!dayColumnDiv) continue;
+                    const dayShifts = (shiftsByDay[dayIndex] || []);
+                    mainBlocks.forEach(block => {
+                        const shiftsInBlock = dayShifts
+                            .filter(shift => {
+                                const shiftStart = timeToMinutes(shift.start_time);
+                                const shiftEnd = timeToMinutes(shift.end_time);
+                                return Math.max(shiftStart, block.start) < Math.min(shiftEnd, block.end);
+                            })
+                            .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
+                        if (shiftsInBlock.length === 0) {
+                            renderEmptyBlock(dayColumnDiv, block.start, block.end - block.start);
+                        } else {
+                            let lastEndTime = block.start;
+                            shiftsInBlock.forEach((shift, index) => {
+                                const shiftStart = timeToMinutes(shift.start_time);
+                                const shiftEnd = timeToMinutes(shift.end_time);
+                                if (shiftStart > lastEndTime) {
+                                    renderEmptyBlock(dayColumnDiv, lastEndTime, shiftStart - lastEndTime);
+                                }
+                                renderShiftBlock(dayColumnDiv, shift, index);
+                                lastEndTime = Math.max(lastEndTime, shiftEnd);
+                            });
+                            if (block.end > lastEndTime) {
+                                renderEmptyBlock(dayColumnDiv, lastEndTime, block.end - lastEndTime);
+                            }
+                        }
+                    });
+                }
+                // 7. Log debug
+                const dayCols = shiftGrid.querySelectorAll('[data-day-index]');
+                const emptyBlocks = shiftGrid.querySelectorAll('.empty-slot');
+                const shiftBlocks = shiftGrid.querySelectorAll('.shift-block:not(.empty-slot)');
+                console.log('[DEBUG] Tổng số cột ngày:', dayCols.length);
+                console.log('[DEBUG] Tổng số block empty-slot:', emptyBlocks.length);
+                console.log('[DEBUG] Tổng số block shift:', shiftBlocks.length);
+                console.log('[DEBUG] shiftGrid DOM:', shiftGrid.innerHTML);
+            } catch (err) {
+                console.error('[ERROR] renderTimetableShifts:', err);
+            }
+        }
+
+        // Khi load trang, nếu input date chưa đúng tuần hiện tại thì cập nhật lại
+        currentTimetableWeek = getMonday(new Date());
+        updateTimetableWeekUI();
+        renderTimetableShifts();
+        timetableWeekSelect.value = formatDate(currentTimetableWeek);
+    });
+
+    // Thêm sau function renderShiftBlock (trong renderTimetableShifts)
+    function openShiftDetailModal(shift) {
+        const modal = document.getElementById('shift-detail-modal');
+        const content = document.getElementById('shift-detail-content');
+        modal.classList.remove('hidden');
+        // Hiển thị loading
+        content.innerHTML = '<div class="text-center text-gray-500 py-8">Đang tải...</div>';
+
+        // Lấy thông tin khả dụng của nhân viên cho ca này
+        const promises = (shift.assigned_employees || []).map(emp =>
+            fetch(`${API_BASE_URL}/employee-availability/${emp.id}?weekStart=${shift.start_date}`)
+            .then(r => r.json())
+            .then(data => {
+                // Tìm đúng ngày và loại ca
+                const found = (data.availability||[]).find(a => a.available_date.startsWith(shift.start_date) && a.shift_type_name === shift.shift_type);
+                return { ...emp, note: found ? found.note : '' };
+            })
+        );
+
+        Promise.all(promises).then(empsWithNotes => {
+            // Render form
+            content.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Loại ca</label>
+                        <input id="edit-shift-type" class="w-full border rounded px-3 py-2 mb-3" value="${shift.shift_type}" />
+                        <label class="block text-sm font-medium mb-1">Ngày</label>
+                        <input id="edit-shift-date" type="date" class="w-full border rounded px-3 py-2 mb-3" value="${shift.start_date}" />
+                        <label class="block text-sm font-medium mb-1">Bắt đầu</label>
+                        <input id="edit-shift-start" type="time" class="w-full border rounded px-3 py-2 mb-3" value="${shift.start_time}" />
+                        <label class="block text-sm font-medium mb-1">Kết thúc</label>
+                        <input id="edit-shift-end" type="time" class="w-full border rounded px-3 py-2 mb-3" value="${shift.end_time}" />
+                        <label class="block text-sm font-medium mb-1">Nghỉ (tùy chọn)</label>
+                        <div class="flex gap-2 mb-3">
+                            <input id="edit-shift-break-start" type="time" class="w-1/2 border rounded px-3 py-2" value="${shift.break_start_time||''}" />
+                            <input id="edit-shift-break-end" type="time" class="w-1/2 border rounded px-3 py-2" value="${shift.break_end_time||''}" />
+                        </div>
+                        <label class="block text-sm font-medium mb-1">Ghi chú ca</label>
+                        <textarea id="edit-shift-notes" class="w-full border rounded px-3 py-2 mb-3">${shift.notes||''}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Nhân viên được phân công</label>
+                        <ul class="mb-3" id="edit-shift-employee-list">
+                            ${empsWithNotes.map(emp => `
+                                <li class="flex items-start gap-2 mb-2">
+                                    <span class="font-semibold">${emp.name}</span>
+                                    <span class="text-xs text-gray-500">(${emp.employee_id})</span>
+                                    <span class="ml-2 text-xs text-blue-600">${emp.note ? 'Ghi chú: '+emp.note : ''}</span>
+                                    <button class="ml-auto text-red-500 hover:underline remove-emp-btn" data-emp-id="${emp.id}">Xóa</button>
+                                </li>
+                            `).join('')}
+                        </ul>
+                        <button id="add-emp-to-shift-detail" class="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300">+ Thêm nhân viên</button>
+                    </div>
+                </div>
+            `;
+            // Xử lý xóa nhân viên khỏi ca
+            content.querySelectorAll('.remove-emp-btn').forEach(btn => {
+                btn.onclick = () => {
+                    btn.parentElement.remove();
+                };
+            });
+            // Thêm nhân viên mới (hiện modal chọn nhân viên, tái sử dụng logic cũ)
+            document.getElementById('add-emp-to-shift-detail').onclick = () => {
+                renderEmployeeSelectionModal();
+                employeeSelectionModal.classList.remove('hidden');
+            };
+        });
+
+        // Đóng modal
+        document.getElementById('close-shift-detail-modal').onclick = () => modal.classList.add('hidden');
+        // Xóa ca
+        document.getElementById('delete-shift-detail-btn').onclick = async () => {
+            if (confirm('Bạn chắc chắn muốn xóa ca này?')) {
+                await fetch(`${API_BASE_URL}/shifts/${shift.id}`, { method: 'DELETE' });
+                modal.classList.add('hidden');
+                renderTimetableShifts();
+            }
+        };
+        // Lưu ca
+        document.getElementById('save-shift-detail-btn').onclick = async () => {
+            // Lấy dữ liệu từ form
+            const newType = document.getElementById('edit-shift-type').value;
+            const newDate = document.getElementById('edit-shift-date').value;
+            const newStart = document.getElementById('edit-shift-start').value;
+            const newEnd = document.getElementById('edit-shift-end').value;
+            const newBreakStart = document.getElementById('edit-shift-break-start').value;
+            const newBreakEnd = document.getElementById('edit-shift-break-end').value;
+            const newNotes = document.getElementById('edit-shift-notes').value;
+            const empIds = Array.from(document.querySelectorAll('#edit-shift-employee-list .remove-emp-btn')).map(btn => btn.dataset.empId);
+            await fetch(`${API_BASE_URL}/shifts/${shift.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    shiftType: newType,
+                    startDate: newDate,
+                    startTime: newStart,
+                    endDate: newDate,
+                    endTime: newEnd,
+                    breakStartTime: newBreakStart,
+                    breakEndTime: newBreakEnd,
+                    notes: newNotes,
+                    employeeIds: empIds
+                })
+            });
+            modal.classList.add('hidden');
+            renderTimetableShifts();
+        };
+    }
+
+    // Helper function: getMonday (lấy thứ Hai của tuần chứa ngày truyền vào)
+    function getMonday(d) {
+        d = new Date(d);
+        const day = d.getDay(), diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(d.setDate(diff));
+        monday.setHours(0, 0, 0, 0);
+        return monday;
+    }
+
+    // Helper function: formatDate (YYYY-MM-DD)
+    function formatDate(date) {
+        return new Date(date).toISOString().split('T')[0];
+    }
+
+    // Helper function: addDays (cộng số ngày vào một ngày)
+    function addDays(date, days) {
+        const result = new Date(date);
+        result.setDate(result.getDate() + days);
+        return result;
+    }
+
+</script>
+</body>
+</html>
